@@ -2,31 +2,14 @@ import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
 
 // Validamos que las variables existan para evitar errores
-if (!process.env.SAP_IAS_JWKS_URI) {
-  console.error("Falta la variable SAP_IAS_JWKS_URI en .env");
-  process.exit(1);
-}
 
 if (!process.env.JWT_SECRET) {
   console.error("Falta la variable JWT_SECRET en .env");
   process.exit(1);
 }
 
-// Cliente JWKS apuntando a SAP IAS
-const client = jwksClient({
-  jwksUri: process.env.SAP_IAS_JWKS_URI
-});
 
-// Función para obtener la clave pública desde SAP IAS
-function getKey(header, callback) {
-  client.getSigningKey(header.kid, (err, key) => {
-    if (err) {
-      return callback(err);
-    }
-    const signingKey = key.getPublicKey();
-    callback(null, signingKey);
-  });
-}
+
 
 export const authenticateToken = (req, res, next) => {
   const authHeader = req.header('Authorization');
