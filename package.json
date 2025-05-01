@@ -1,0 +1,28 @@
+{
+  "name": "reactdemo-server",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@sap/hana-client": "^2.24.24",
+    "bcryptjs": "^3.0.2",
+    "body-parser": "^2.2.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0",
+    "express-session": "^1.18.1",
+    "fundamental-styles": "^0.38.0",
+    "jsonwebtoken": "^9.0.2",
+    "jwks-rsa": "^3.2.0",
+    "morgan": "^1.10.0",
+    "mssql": "^11.0.1",
+    "passport": "^0.7.0",
+    "passport-openidconnect": "^0.1.2",
+    "qrcode": "^1.5.4",
+    "speakeasy": "^2.0.0",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
+  }
+}
