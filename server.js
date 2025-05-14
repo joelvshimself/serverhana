@@ -18,6 +18,9 @@ app.use(morgan('dev'));
 // Configurar Swagger
 setupSwagger(app);
 
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', message: 'API funcionando correctamente' });
+});
 
 app.use('/api', crudr);
 

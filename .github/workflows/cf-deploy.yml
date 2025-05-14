@@ -1,37 +1,41 @@
-name: Deploy to Cloud Foundry
+name: Deploy to SAP Cloud Foundry
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout repo
+        uses: actions/checkout@v3
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
+      # - name: Run Tests
+      #   run: npm test
 
-    - name: Install dependencies
-      run: npm install
+      - name: Install Cloud Foundry CLI
+        run: |
+          curl -L "https://packages.cloudfoundry.org/stable?release=linux64&source=github" > cf-cli.tgz
+          tar -xvf cf-cli.tgz
+          sudo mv cf /usr/local/bin/cf
 
-    - name: Install Cloud Foundry CLI
-      run: |
-        curl -v -L "https://packages.cloudfoundry.org/stable?release=linux64-binary&source=github" -o cf.tgz
-        tar -xvf cf.tgz
-        sudo mv cf /usr/local/bin
+      - name: Set API endpoint
+        run: cf api ${{ secrets.CF_SAP_API }}
 
-    - name: Authenticate to Cloud Foundry
-      run: |
-        cf api ${{ secrets.CF_API }}
-        cf auth ${{ secrets.CF_USERNAME }} ${{ secrets.CF_PASSWORD }}
-        cf target -o ${{ secrets.CF_ORG }} -s ${{ secrets.CF_SPACE }}
+      - name: Auth with token
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: cf auth "$CF_API_TOKEN"
 
-    - name: Deploy to Cloud Foundry
-      run: cf push
+      - name: Target org and space
+        run: cf target -o f3673abbtrial -s dev
+
+      - name: Push app
+        run: cf push
+
+      - name: Run Health Check
+        run: curl --fail ${{ secrets.CF_API_HEALTH }} 
+
+      
