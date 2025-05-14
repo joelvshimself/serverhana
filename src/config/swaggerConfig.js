@@ -1,5 +1,8 @@
 import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
+//importar dotenv
+import dotenv from 'dotenv';
+dotenv.config();
 
 const swaggerOptions = {
   definition: {
@@ -11,7 +14,7 @@ const swaggerOptions = {
     },
     servers: [
       {
-        url: 'http://localhost:3000',
+        url: process.env.URL,
         description: 'Servidor Local',
       },
     ],
