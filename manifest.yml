@@ -1,0 +1,6 @@
+applications:
+  - name: serverhana
+    memory: 128M
+    buildpacks:
+      - nodejs_buildpack
+    path: .
