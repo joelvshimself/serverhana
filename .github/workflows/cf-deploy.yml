@@ -8,10 +8,15 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    env:
+      CF_USERNAME: ${{ secrets.CF_USERNAME }}
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
 
+      # Aquí puedes habilitar tests si los necesitas
       # - name: Run Tests
       #   run: npm test
 
@@ -21,21 +26,14 @@ jobs:
           tar -xvf cf-cli.tgz
           sudo mv cf /usr/local/bin/cf
 
-      - name: Set API endpoint
-        run: cf api ${{ secrets.CF_SAP_API }}
+      - name: Login to Cloud Foundry
+        run: |
+          cf api ${{ secrets.CF_API }}
+          cf auth "$CF_USERNAME" "$CF_PASSWORD"
+          cf target -o f3673abbtrial -s dev
 
-      - name: Auth with token
-        env:
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-        run: cf auth "$CF_API_TOKEN"
-
-      - name: Target org and space
-        run: cf target -o f3673abbtrial -s dev
-
-      - name: Push app
+      - name: Push app to CF
         run: cf push
 
       - name: Run Health Check
-        run: curl --fail ${{ secrets.CF_API_HEALTH }} 
-
-      
+        run: curl --fail ${{ secrets.CF_API_HEALTH }}
