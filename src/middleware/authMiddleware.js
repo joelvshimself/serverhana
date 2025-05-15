@@ -1,5 +1,4 @@
 import jwt from 'jsonwebtoken';
-import jwksClient from 'jwks-rsa';
 
 // Validamos que las variables existan para evitar errores
 
@@ -25,6 +24,7 @@ export const authenticateToken = (req, res, next) => {
       const decoded = jwt.decode(token, { complete: true });
       return !!decoded?.header?.kid; // Si tiene .kid, es SAP IAS
     } catch (e) {
+      console.error("Error al decodificar el token:", e.message);
       return false;
     }
   };
@@ -41,15 +41,4 @@ export const authenticateToken = (req, res, next) => {
     }
   }
 
-  // Si es token SAP, usamos JWKS
-  jwt.verify(token, getKey, (err, decoded) => {
-    if (err) {
-      console.error("Token SAP IAS inválido:", err.message);
-      return res.status(401).json({ message: "Token SAP IAS inválido" });
-    }
-
-    req.user = decoded;
-    console.log("Token SAP IAS válido:", decoded);
-    next();
-  });
 };

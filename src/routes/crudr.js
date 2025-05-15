@@ -540,6 +540,8 @@ crudr.delete("/ventas/:id", async (req, res) => {
       DELETE FROM Venta WHERE id_venta = ${ventaId}
     `);
 
+    print(result);
+
     res.status(200).json({ message: `Venta ${ventaId} eliminada exitosamente` });
 
   } catch (error) {
@@ -676,6 +678,7 @@ crudr.get("/ordenes", async (req, res) => {
     `);
 
     res.status(200).json(result);
+
   } catch (error) {
     console.error(" Error al obtener órdenes:", error);
     res.status(500).json({ error: "Error al obtener órdenes", detail: error.message });
