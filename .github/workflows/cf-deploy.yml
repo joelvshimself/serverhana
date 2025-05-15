@@ -22,11 +22,13 @@ jobs:
 
       - name: Install Cloud Foundry CLI
         run: |
-          wget "https://packages.cloudfoundry.org/stable?release=linux64-binary&source=github" -O cf-cli.tgz
-          mkdir cf-cli
-          tar -xvzf cf-cli.tgz -C cf-cli
-          sudo mv cf-cli/cf /usr/local/bin/cf
-          cf --version
+          sudo apt-get update
+          sudo apt-get install -y wget gnupg
+          wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo gpg --dearmor -o /usr/share/keyrings/cli.cloudfoundry.org.gpg
+          echo "deb [signed-by=/usr/share/keyrings/cli.cloudfoundry.org.gpg] https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+          sudo apt-get update
+          sudo apt-get install -y cf8-cli
+          cf version
 
       - name: Login to Cloud Foundry
         run: |
