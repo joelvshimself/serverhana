@@ -738,6 +738,124 @@ crudr.put("/ordenes/:id", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /api/notificaciones:
+ *   post:
+ *     summary: Crear una nueva notificación
+ *     tags: [temporal]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - mensaje
+ *               - tipo
+ *             properties:
+ *               mensaje:
+ *                 type: string
+ *                 example: Tienes una nueva orden asignada
+ *               tipo:
+ *                 type: string
+ *                 example: orden
+ *     responses:
+ *       201:
+ *         description: Notificación creada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Notificación creada correctamente
+ *       400:
+ *         description: Datos inválidos
+ *       500:
+ *         description: Error interno del servidor
+ */
+
+/**
+ * @swagger
+ * /api/notificaciones:
+ *   get:
+ *     summary: Obtener todas las notificaciones
+ *     tags: [temporal]
+ *     responses:
+ *       200:
+ *         description: Lista de notificaciones
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id_notificacion:
+ *                     type: integer
+ *                   mensaje:
+ *                     type: string
+ *                   tipo:
+ *                     type: string
+ *                   fecha:
+ *                     type: string
+ *                     format: date
+ *                   id_usuario:
+ *                     type: integer
+ *       500:
+ *         description: Error al obtener notificaciones
+ */
+// ==== NOTIFICACIONES ====
+
+// POST: Crear una nueva notificación
+crudr.post('/notificaciones', async (req, res) => {
+  const { mensaje, tipo, id_usuario } = req.body;
+  let connection;
+
+  if (!mensaje || !tipo) {
+    return res.status(400).json({ error: 'Se requieren los campos: mensaje y tipo.' });
+  }
+
+  try {
+    connection = await poolPromise;
+
+    await connection.exec(`
+      INSERT INTO Notificacion (mensaje, tipo, fecha${id_usuario ? ', id_usuario' : ''})
+      VALUES ('${mensaje}', '${tipo}', CURRENT_DATE${id_usuario ? `, ${id_usuario}` : ''})
+    `);
+
+    res.status(201).json({ message: 'Notificación creada correctamente' });
+
+  } catch (error) {
+    console.error('Error al crear notificación:', error);
+    res.status(500).json({ error: 'Error al crear notificación', detail: error.message });
+  }
+});
+
+// GET: Obtener todas las notificaciones
+crudr.get('/notificaciones', async (req, res) => {
+  let connection;
+
+  try {
+    connection = await poolPromise;
+
+    const notificaciones = await connection.exec(`
+      SELECT id_notificacion, mensaje, tipo, id_usuario
+      FROM Notificacion
+      ORDER BY id_usuario DESC
+    `);
+
+    res.status(200).json(notificaciones);
+
+  } catch (error) {
+    console.error('Error al obtener notificaciones:', error);
+    res.status(500).json({ error: 'Error al obtener notificaciones', detail: error.message });
+  }
+});
+
+
 
 
 
