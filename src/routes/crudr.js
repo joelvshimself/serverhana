@@ -49,9 +49,9 @@ const crudr = express.Router();
  */
 
 crudr.post('/nuevaorden', async (req, res) => {
-  const { correo_solicita, correo_provee, productos } = req.body;
+  const { correo_solicita, correo_provee, productos, fechas_emision } = req.body;
 
-  if (!correo_solicita || !correo_provee || !Array.isArray(productos)) {
+  if (!correo_solicita || !correo_provee || !fechas_emision || !Array.isArray(productos)) {
     return res.status(400).json({
       error: 'Faltan campos necesarios: correo_solicita, correo_provee o productos'
     });
@@ -63,10 +63,9 @@ crudr.post('/nuevaorden', async (req, res) => {
     connection = await poolPromise;
 
     // Buscar ID del solicitante por correo
-    const idSolicitaQuery = await connection.exec(
-      `SELECT id_usuario AS id_solicita FROM Usuario WHERE LOWER(email) = LOWER('${correo_solicita}')`
-    );
-    const id_solicita = idSolicitaQuery[0]?.ID_SOLICITA;
+    const id_solicita = (await connection.exec(
+      `SELECT id_usuario FROM Usuario WHERE LOWER(email) = LOWER(?)`, [correo_solicita]
+    ))[0]?.ID_USUARIO;
 
     if (!id_solicita) {
       return res.status(404).json({
@@ -75,10 +74,9 @@ crudr.post('/nuevaorden', async (req, res) => {
     }
 
     // Buscar ID del proveedor por correo
-    const idProveeQuery = await connection.exec(
-      `SELECT id_usuario AS id_provee FROM Usuario WHERE LOWER(email) = LOWER('${correo_provee}')`
-    );
-    const id_provee = idProveeQuery[0]?.ID_PROVEE;
+    const id_provee = (await connection.exec(
+      `SELECT id_usuario FROM Usuario WHERE LOWER(email) = LOWER(?)`, [correo_provee]
+    ))[0]?.ID_USUARIO;
 
     if (!id_provee) {
       return res.status(404).json({
@@ -90,12 +88,13 @@ crudr.post('/nuevaorden', async (req, res) => {
     const crearOrdenResult = await connection.exec(`
       DO BEGIN
         DECLARE nueva_orden INT;
-        CALL crearOrdenExtensa(${id_solicita}, ${id_provee}, nueva_orden);
+        CALL crearOrdenExtensa(?, ?, ?, nueva_orden);
         SELECT :nueva_orden AS ID_ORDEN_OUTPUT FROM DUMMY;
       END;
-    `);
+    `, [id_solicita, id_provee, fechas_emision]);
 
     const nueva_orden = crearOrdenResult[0]?.ID_ORDEN_OUTPUT;
+    if (!nueva_orden) return res.status(500).json({ error: 'No se obtuvo el ID de la orden' });
 
     if (!nueva_orden) {
       return res.status(500).json({
@@ -114,15 +113,15 @@ crudr.post('/nuevaorden', async (req, res) => {
       }
 
       await connection.exec(
-        `CALL agregarSuborden(${nueva_orden}, '${nombre_producto}', ${cantidad}, ${precio})`
+        `CALL agregarSuborden(${nueva_orden}, '${nombre_producto}', ${cantidad}, ${precio}, ${fechas_emision})`
       );
     }
 
     // Crear notificación
-    await connection.exec(`
-      INSERT INTO Notificacion (mensaje, fecha, tipo, id_usuario)
-      VALUES ('Tienes una nueva orden asignada', CURRENT_DATE, 'orden', ${id_provee})
-    `);
+    await connection.exec(
+      `INSERT INTO Notificacion (mensaje, fecha, tipo, id_usuario) VALUES (?, ?, 'orden', ?)`,
+      ['Tienes una nueva orden asignada', fechas_emision, id_provee]
+    );
 
     res.status(201).json({
       message: 'Orden creada exitosamente',
@@ -194,28 +193,34 @@ crudr.post('/nuevaorden', async (req, res) => {
 
 crudr.post('/completarorden/:id', async (req, res) => {
   const ordenId = req.params.id;
+  const { fecha } = req.body; // Nueva fecha proporcionada
   let connection;
+
 
   try {
     connection = await poolPromise;
 
-    // Obtener fecha actual en formato YYYY-MM-DD
-    const today = new Date().toISOString().slice(0, 10);
+    // Validación básica de fecha
+    if (!fecha || isNaN(Date.parse(fecha))) {
+      return res.status(400).json({
+        error: 'Fecha de recepcion inválida o no proporcionada'
+      });
+    }
 
     // 1. Cambiar estado de la orden a 'completada' y asignar fecha_recepcion
     await connection.exec(`
       UPDATE Orden
       SET estado = 'completada',
-          fecha_recepcion = '${today}'
-      WHERE id_orden = ${ordenId}
-    `);
+          fecha_recepcion = ?
+      WHERE id_orden = ?
+    `, [fecha, ordenId]);
 
     // 2. Obtener el ID del detallista (usuario que solicitó la orden)
     const detallistaResult = await connection.exec(`
       SELECT id_usuario_solicita
       FROM Orden
-      WHERE id_orden = ${ordenId}
-    `);
+      WHERE id_orden = ?
+    `,[ordenId]);
 
     const id_detallista = detallistaResult[0]?.ID_USUARIO_SOLICITA;
 
@@ -228,7 +233,7 @@ crudr.post('/completarorden/:id', async (req, res) => {
     // 3. Crear notificación para el detallista
     await connection.exec(`
       INSERT INTO Notificacion (mensaje, fecha, tipo, id_usuario)
-      VALUES ('¡Tu orden #${ordenId} ya llegó!', CURRENT_DATE, 'orden_recibida', ${id_detallista})
+      VALUES ('¡Tu orden #${ordenId} ya llegó!', ${fecha} , 'orden_recibida', ${id_detallista})
     `);
 
     // 4. Obtener productos de la orden
@@ -243,8 +248,6 @@ crudr.post('/completarorden/:id', async (req, res) => {
     }
 
     // 5. Insertar productos en inventario
-    const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
-
     for (const prod of productos) {
       const { NOMBRE_PRODUCTO, CANTIDAD } = prod;
 
@@ -252,7 +255,7 @@ crudr.post('/completarorden/:id', async (req, res) => {
         await connection.exec(`
           INSERT INTO Inventario (producto, fecha, estado, tipo_movimiento, observaciones)
           VALUES (?, ?, 'disponible', 'ingreso por orden', ?)
-        `, [NOMBRE_PRODUCTO, now, `Orden completada: #${ordenId}`]);
+        `, [NOMBRE_PRODUCTO, fecha, `Orden completada: #${ordenId}`]);
       }
     }
 
@@ -319,11 +322,11 @@ crudr.post('/completarorden/:id', async (req, res) => {
  */
 
 crudr.post('/vender', async (req, res) => {
-  const { productos } = req.body;
+  const { productos, fecha } = req.body;
   let connection;
 
-  if (!Array.isArray(productos)) {
-    return res.status(400).json({ error: 'Se requiere un array de productos y cantidades.' });
+  if ( !fecha || !Array.isArray(productos) || isNaN(Date.parse(fecha)) ) {
+    return res.status(400).json({ error: ' Se requiere fecha y un array de productos y cantidades.' });
   }
 
   // Inicializar cantidades
@@ -376,8 +379,8 @@ crudr.post('/vender', async (req, res) => {
     // 2. Crear la venta
     await connection.exec(`
       INSERT INTO Venta (fecha, total)
-      VALUES (CURRENT_DATE, 0)
-    `);
+      VALUES (?, 0
+    `, [fecha]);
 
     // 3. Obtener ID de la venta recién creada
     const ventaResult = await connection.exec(`
