@@ -30,6 +30,9 @@ const crudr = express.Router();
  *                 type: string
  *               correo_provee:
  *                 type: string
+ *               fecha:
+ *                 type: string
+ *                 format: date
  *               productos:
  *                 type: array
  *                 items:
@@ -41,20 +44,24 @@ const crudr = express.Router();
  *                       type: integer
  *                     precio:
  *                       type: number
- *                     fecha_caducidad:
- *                       type: string
  *     responses:
  *       201:
  *         description: Orden creada exitosamente
+ *       400:
+ *         description: Error en los datos enviados
+ *       500:
+ *         description: Error interno al crear la orden
  */
 
 crudr.post('/nuevaorden', async (req, res) => {
-  const { correo_solicita, correo_provee, productos, fechas_emision } = req.body;
+  const { correo_solicita, correo_provee, productos, fecha } = req.body;
 
-  if (!correo_solicita || !correo_provee || !fechas_emision || !Array.isArray(productos)) {
-    return res.status(400).json({
-      error: 'Faltan campos necesarios: correo_solicita, correo_provee o productos'
-    });
+  if (!correo_solicita || !correo_provee || !fecha || !Array.isArray(productos)) {
+    return res.status(400).json({ error: 'Faltan campos necesarios: correo_solicita, correo_provee, productos o fecha' });
+  }
+
+  if (isNaN(Date.parse(fecha))) {
+    return res.status(400).json({ error: 'La fecha proporcionada no es válida' });
   }
 
   let connection;
@@ -62,215 +69,174 @@ crudr.post('/nuevaorden', async (req, res) => {
   try {
     connection = await poolPromise;
 
-    // Buscar ID del solicitante por correo
     const id_solicita = (await connection.exec(
       `SELECT id_usuario FROM Usuario WHERE LOWER(email) = LOWER(?)`, [correo_solicita]
     ))[0]?.ID_USUARIO;
 
-    if (!id_solicita) {
-      return res.status(404).json({
-        error: `Correo del solicitante no encontrado: ${correo_solicita}`
-      });
-    }
-
-    // Buscar ID del proveedor por correo
     const id_provee = (await connection.exec(
       `SELECT id_usuario FROM Usuario WHERE LOWER(email) = LOWER(?)`, [correo_provee]
     ))[0]?.ID_USUARIO;
 
-    if (!id_provee) {
-      return res.status(404).json({
-        error: `Correo del proveedor no encontrado: ${correo_provee}`
-      });
+    if (!id_solicita || !id_provee) {
+      return res.status(404).json({ error: 'Correo del solicitante o proveedor no encontrado' });
     }
 
-    // Crear orden
     const crearOrdenResult = await connection.exec(`
       DO BEGIN
         DECLARE nueva_orden INT;
         CALL crearOrdenExtensa(?, ?, ?, nueva_orden);
         SELECT :nueva_orden AS ID_ORDEN_OUTPUT FROM DUMMY;
       END;
-    `, [id_solicita, id_provee, fechas_emision]);
+    `, [id_solicita, id_provee, fecha]);
 
     const nueva_orden = crearOrdenResult[0]?.ID_ORDEN_OUTPUT;
     if (!nueva_orden) return res.status(500).json({ error: 'No se obtuvo el ID de la orden' });
 
-    if (!nueva_orden) {
-      return res.status(500).json({
-        error: 'No se pudo obtener el ID de la orden recién creada'
-      });
-    }
-
-    // Insertar productos
-    for (const producto of productos) {
-      const { producto: nombre_producto, cantidad, precio } = producto;
-
+    for (const { producto: nombre_producto, cantidad, precio } of productos) {
       if (!nombre_producto || !cantidad || !precio) {
-        return res.status(400).json({
-          error: 'Cada producto debe tener nombre, cantidad y precio'
-        });
+        return res.status(400).json({ error: 'Cada producto debe tener nombre, cantidad y precio' });
       }
 
       await connection.exec(
-        `CALL agregarSuborden(${nueva_orden}, '${nombre_producto}', ${cantidad}, ${precio}, ${fechas_emision})`
+        `CALL agregarSuborden(?, ?, ?, ?, ?)`,
+        [nueva_orden, nombre_producto, cantidad, precio, fecha]
       );
     }
 
-    // Crear notificación
     await connection.exec(
       `INSERT INTO Notificacion (mensaje, fecha, tipo, id_usuario) VALUES (?, ?, 'orden', ?)`,
-      ['Tienes una nueva orden asignada', fechas_emision, id_provee]
+      ['Tienes una nueva orden asignada', fecha, id_provee]
     );
 
-    res.status(201).json({
-      message: 'Orden creada exitosamente',
-      id_orden: nueva_orden
-    });
+    res.status(201).json({ message: 'Orden creada exitosamente', id_orden: nueva_orden });
 
   } catch (error) {
-    if (error.response) {
-      console.error('Error de respuesta:', error.response.data);
-    } else if (error.request) {
-      console.error('Error de solicitud:', error.request);
-    } else {
-      console.error('Error:', error.message);
-    }
-  }  
+    console.error('Error:', error.message);
+    res.status(500).json({ error: 'Error interno al crear la orden', detail: error.message });
+  }
 });
+
 
 
 /**
  * @swagger
- * /api/completarorden/{id}:
+ * /api/vender:
  *   post:
- *     summary: Completar una orden y actualizar inventario
- *     description: Inserta en la tabla Inventario una fila por cada unidad de los productos asociados a la orden especificada.
- *     tags:
- *       - temporal
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         description: ID de la orden que se quiere completar
- *         schema:
- *           type: integer
+ *     summary: Realizar una venta de productos del inventario
+ *     tags: [temporal]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fecha:
+ *                 type: string
+ *                 format: date
+ *               productos:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     producto:
+ *                       type: string
+ *                     cantidad:
+ *                       type: integer
  *     responses:
- *       200:
- *         description: Inventario actualizado exitosamente
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: Orden 5 completada e inventario actualizado
- *       404:
- *         description: No se encontraron productos para la orden
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: No hay productos asociados a la orden 5
+ *       201:
+ *         description: Venta realizada exitosamente
+ *       400:
+ *         description: Error de validación o inventario insuficiente
  *       500:
- *         description: Error interno del servidor
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Error al completar orden
- *                 detail:
- *                   type: string
- *                   example: Error al ejecutar getProductosPorOrden
+ *         description: Error interno
  */
 
-crudr.post('/completarorden/:id', async (req, res) => {
-  const ordenId = req.params.id;
-  const { fecha } = req.body; // Nueva fecha proporcionada
-  let connection;
+crudr.post('/vender', async (req, res) => {
+  const { productos, fecha } = req.body;
+  if (!fecha || isNaN(Date.parse(fecha)) || !Array.isArray(productos)) {
+    return res.status(400).json({ error: 'Se requiere una fecha válida y un array de productos.' });
+  }
 
+  let connection;
+  let totalVenta = 0;
+  const precios = { arrachera: 320, ribeye: 450, tomahawk: 600, diezmillo: 280 };
+  const cantidades = { arrachera: 0, ribeye: 0, tomahawk: 0, diezmillo: 0 };
+
+  for (const { producto, cantidad } of productos) {
+    if (!producto || typeof cantidad !== 'number') {
+      return res.status(400).json({ error: 'Cada producto debe tener nombre y cantidad numérica.' });
+    }
+
+    const nombre = producto.toLowerCase();
+    if (!(nombre in precios)) {
+      return res.status(400).json({ error: `Producto no reconocido: ${producto}` });
+    }
+
+    cantidades[nombre] += cantidad;
+  }
 
   try {
     connection = await poolPromise;
 
-    // Validación básica de fecha
-    if (!fecha || isNaN(Date.parse(fecha))) {
-      return res.status(400).json({
-        error: 'Fecha de recepcion inválida o no proporcionada'
-      });
+    const inventarioOK = (await connection.exec(`
+      SELECT resultado FROM puedoVenderInventario(?, ?, ?, ?)
+    `, [cantidades.arrachera, cantidades.ribeye, cantidades.tomahawk, cantidades.diezmillo]))[0]?.RESULTADO;
+
+    if (inventarioOK !== 1) {
+      return res.status(400).json({ error: 'No hay suficiente inventario para completar la venta.' });
     }
 
-    // 1. Cambiar estado de la orden a 'completada' y asignar fecha_recepcion
-    await connection.exec(`
-      UPDATE Orden
-      SET estado = 'completada',
-          fecha_recepcion = ?
-      WHERE id_orden = ?
-    `, [fecha, ordenId]);
+    await connection.exec(`INSERT INTO Venta (fecha, total) VALUES (?, 0)`, [fecha]);
 
-    // 2. Obtener el ID del detallista (usuario que solicitó la orden)
-    const detallistaResult = await connection.exec(`
-      SELECT id_usuario_solicita
-      FROM Orden
-      WHERE id_orden = ?
-    `,[ordenId]);
+    const ventaResult = await connection.exec(`SELECT MAX(id_venta) AS id_venta FROM Venta`);
+    const idVenta = ventaResult[0]?.ID_VENTA;
 
-    const id_detallista = detallistaResult[0]?.ID_USUARIO_SOLICITA;
+    if (!idVenta) return res.status(500).json({ error: 'No se pudo obtener ID de la venta' });
 
-    if (!id_detallista) {
-      return res.status(404).json({
-        error: `No se encontró el solicitante para la orden ${ordenId}`
-      });
-    }
+    for (const { producto, cantidad } of productos) {
+      const nombre = producto.toLowerCase();
+      const precioUnitario = precios[nombre];
 
-    // 3. Crear notificación para el detallista
-    await connection.exec(`
-      INSERT INTO Notificacion (mensaje, fecha, tipo, id_usuario)
-      VALUES ('¡Tu orden #${ordenId} ya llegó!', ${fecha} , 'orden_recibida', ${id_detallista})
-    `);
+      const inventario = await connection.exec(`
+        SELECT id_inventario FROM Inventario
+        WHERE producto = ? AND estado = 'disponible'
+        ORDER BY fecha LIMIT ?
+      `, [nombre, cantidad]);
 
-    // 4. Obtener productos de la orden
-    const productos = await connection.exec(
-      `SELECT * FROM getProductosPorOrden(${ordenId})`
-    );
+      if (inventario.length < cantidad) {
+        return res.status(400).json({ error: `Inventario insuficiente para ${nombre}` });
+      }
 
-    if (productos.length === 0) {
-      return res.status(404).json({
-        error: `No hay productos asociados a la orden ${ordenId}`
-      });
-    }
-
-    // 5. Insertar productos en inventario
-    for (const prod of productos) {
-      const { NOMBRE_PRODUCTO, CANTIDAD } = prod;
-
-      for (let i = 0; i < CANTIDAD; i++) {
+      for (const { ID_INVENTARIO } of inventario) {
         await connection.exec(`
-          INSERT INTO Inventario (producto, fecha, estado, tipo_movimiento, observaciones)
-          VALUES (?, ?, 'disponible', 'ingreso por orden', ?)
-        `, [NOMBRE_PRODUCTO, fecha, `Orden completada: #${ordenId}`]);
+          INSERT INTO DetalleVenta (id_venta, id_inventario, costo_unitario)
+          VALUES (?, ?, ?)
+        `, [idVenta, ID_INVENTARIO, precioUnitario]);
+
+        await connection.exec(`
+          UPDATE Inventario
+          SET estado = 'vendido',
+              tipo_movimiento = 'salida por venta',
+              observaciones = ?
+          WHERE id_inventario = ?
+        `, [`Vendido en venta #${idVenta}`, ID_INVENTARIO]);
+
+        totalVenta += precioUnitario;
       }
     }
 
-    res.status(200).json({
-      message: `Orden ${ordenId} completada, fecha de recepción registrada, notificación enviada al detallista y productos ingresados al inventario`
-    });
+    await connection.exec(`UPDATE Venta SET total = ? WHERE id_venta = ?`, [totalVenta, idVenta]);
+
+    res.status(201).json({ message: 'Venta realizada exitosamente.', id_venta: idVenta, total: totalVenta });
 
   } catch (error) {
-    console.error('Error al completar orden:', error);
-    res.status(500).json({
-      error: 'Error al completar orden',
-      detail: error.message
-    });
+    console.error('Error al vender:', error);
+    res.status(500).json({ error: 'Error al procesar la venta', detail: error.message });
   }
 });
+
+
 
 
 /**
