@@ -6,6 +6,8 @@ import userRoutes from './src/routes/userRoutes.js';
 import setupSwagger from './src/config/swaggerConfig.js';
 import twoFARoutes from './src/routes/twoFARoutes.js';
 import crudr from './src/routes/crudr.js';
+import inventarioRoutes from './src/routes/inventarioRoutes.js';    
+
 
 dotenv.config();
 
@@ -28,6 +30,7 @@ app.use('/api', crudr);
 
 // Luego las rutas de usuarios
 app.use('/api', userRoutes);
+app.use('/api/inventario', inventarioRoutes);  
 
 
 // Port y terminal Host
