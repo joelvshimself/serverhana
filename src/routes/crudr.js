@@ -18,35 +18,77 @@ const crudr = express.Router();
  * /api/nuevaorden:
  *   post:
  *     summary: Crear una nueva orden entre usuarios
- *     tags: [temporal]
+ *     tags: [Ordenes]
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - correo_solicita
+ *               - correo_provee
+ *               - productos
+ *               - fecha_emision
  *             properties:
  *               correo_solicita:
  *                 type: string
+ *                 format: email
+ *                 example: cliente@email.com
  *               correo_provee:
  *                 type: string
+ *                 format: email
+ *                 example: proveedor@email.com
+ *               fecha_emision:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-05-23"
  *               productos:
  *                 type: array
  *                 items:
  *                   type: object
+ *                   required:
+ *                     - producto
+ *                     - cantidad
+ *                     - precio
  *                   properties:
  *                     producto:
  *                       type: string
+ *                       example: arrachera
  *                     cantidad:
  *                       type: integer
+ *                       minimum: 1
+ *                       example: 10
  *                     precio:
  *                       type: number
+ *                       format: float
+ *                       example: 320.0
  *                     fecha_caducidad:
  *                       type: string
+ *                       format: date
+ *                       example: "2025-06-10"
  *     responses:
  *       201:
  *         description: Orden creada exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: Orden creada exitosamente
+ *                 id_orden:
+ *                   type: integer
+ *                   example: 12
+ *       400:
+ *         description: Error de validación
+ *       404:
+ *         description: Usuario no encontrado
+ *       500:
+ *         description: Error interno
  */
+
 
 crudr.post('/nuevaorden', async (req, res) => {
   const { correo_solicita, correo_provee, productos, fecha_emision } = req.body;
@@ -146,19 +188,28 @@ crudr.post('/nuevaorden', async (req, res) => {
  * /api/completarorden/{id}:
  *   post:
  *     summary: Completar una orden y actualizar inventario
- *     description: Inserta en la tabla Inventario una fila por cada unidad de los productos asociados a la orden especificada.
- *     tags:
- *       - temporal
+ *     tags: [Ordenes]
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         description: ID de la orden que se quiere completar
+ *         description: ID de la orden a completar
  *         schema:
  *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               fecha_recepcion:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-05-23"
  *     responses:
  *       200:
- *         description: Inventario actualizado exitosamente
+ *         description: Orden completada e inventario actualizado
  *         content:
  *           application/json:
  *             schema:
@@ -166,30 +217,11 @@ crudr.post('/nuevaorden', async (req, res) => {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: Orden 5 completada e inventario actualizado
+ *                   example: Orden 5 completada, productos ingresados al inventario
  *       404:
- *         description: No se encontraron productos para la orden
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: No hay productos asociados a la orden 5
+ *         description: Orden o productos no encontrados
  *       500:
- *         description: Error interno del servidor
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   example: Error al completar orden
- *                 detail:
- *                   type: string
- *                   example: Error al ejecutar getProductosPorOrden
+ *         description: Error interno al completar la orden
  */
 
 crudr.post('/completarorden/:id', async (req, res) => {
@@ -276,29 +308,40 @@ crudr.post('/completarorden/:id', async (req, res) => {
  * /api/vender:
  *   post:
  *     summary: Realizar una venta de productos del inventario
- *     tags: [temporal]
+ *     tags: [Ventas]
  *     description: |
- *       Procesa la venta de productos disponibles en inventario.
- *       Valida la existencia de suficiente stock, registra la venta y actualiza el inventario como vendido.
- *       Productos soportados: arrachera, ribeye, tomahawk, diezmillo.
+ *       Procesa la venta de productos disponibles en inventario. 
+ *       Registra la venta y actualiza el inventario como vendido.
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - productos
+ *               - fecha_emision
  *             properties:
+ *               fecha_emision:
+ *                 type: string
+ *                 format: date
+ *                 example: "2025-05-23"
  *               productos:
  *                 type: array
  *                 items:
  *                   type: object
+ *                   required:
+ *                     - producto
+ *                     - cantidad
  *                   properties:
  *                     producto:
  *                       type: string
- *                       description: Nombre del producto (arrachera, ribeye, tomahawk, diezmillo)
+ *                       enum: [arrachera, ribeye, tomahawk, diezmillo]
+ *                       example: ribeye
  *                     cantidad:
  *                       type: integer
- *                       description: Número de unidades a vender
+ *                       minimum: 1
+ *                       example: 5
  *     responses:
  *       201:
  *         description: Venta realizada exitosamente
@@ -309,18 +352,22 @@ crudr.post('/completarorden/:id', async (req, res) => {
  *               properties:
  *                 message:
  *                   type: string
+ *                   example: Venta realizada exitosamente.
  *                 id_venta:
  *                   type: integer
+ *                   example: 45
  *                 total:
  *                   type: number
+ *                   format: float
+ *                   example: 2250.00
  *       400:
- *         description: Error de validación o inventario insuficiente
+ *         description: Inventario insuficiente o error de validación
  *       500:
  *         description: Error interno al procesar la venta
  */
 
 crudr.post('/vender', async (req, res) => {
-  const { productos } = req.body;
+  const { fecha_emision, productos } = req.body;
   let connection;
 
   if (!Array.isArray(productos)) {
@@ -377,7 +424,7 @@ crudr.post('/vender', async (req, res) => {
     // 2. Crear la venta
     await connection.exec(`
       INSERT INTO Venta (fecha, total)
-      VALUES (CURRENT_DATE, 0)
+      VALUES ('${fecha_emision}' , 0)
     `);
 
     // 3. Obtener ID de la venta recién creada
@@ -455,6 +502,7 @@ crudr.post('/vender', async (req, res) => {
     res.status(500).json({ error: 'Error al procesar la venta', detail: error.message });
   }
 });
+
 
 /**
  * @swagger
