@@ -49,11 +49,11 @@ const crudr = express.Router();
  */
 
 crudr.post('/nuevaorden', async (req, res) => {
-  const { correo_solicita, correo_provee, productos } = req.body;
+  const { correo_solicita, correo_provee, productos, fecha_emision } = req.body;
 
-  if (!correo_solicita || !correo_provee || !Array.isArray(productos)) {
+  if (!correo_solicita || !correo_provee || !fecha_emision || !Array.isArray(productos)) {
     return res.status(400).json({
-      error: 'Faltan campos necesarios: correo_solicita, correo_provee o productos'
+      error: 'Faltan campos necesarios: correo_solicita,  correo_provee , productos o fecha_emision'
     });
   }
 
@@ -90,7 +90,7 @@ crudr.post('/nuevaorden', async (req, res) => {
     const crearOrdenResult = await connection.exec(`
       DO BEGIN
         DECLARE nueva_orden INT;
-        CALL crearOrdenExtensa(${id_solicita}, ${id_provee}, nueva_orden);
+        CALL crearOrdenExtensa(${id_solicita}, ${id_provee}, '${fecha_emision}', nueva_orden);
         SELECT :nueva_orden AS ID_ORDEN_OUTPUT FROM DUMMY;
       END;
     `);
@@ -114,7 +114,7 @@ crudr.post('/nuevaorden', async (req, res) => {
       }
 
       await connection.exec(
-        `CALL agregarSuborden(${nueva_orden}, '${nombre_producto}', ${cantidad}, ${precio})`
+        `CALL agregarSuborden(${nueva_orden}, '${nombre_producto}', ${cantidad}, ${precio}, '${fecha_emision}')`
       );
     }
 
@@ -193,6 +193,7 @@ crudr.post('/nuevaorden', async (req, res) => {
  */
 
 crudr.post('/completarorden/:id', async (req, res) => {
+  const { fecha_recepcion } = req.body;
   const ordenId = req.params.id;
   let connection;
 
@@ -200,7 +201,7 @@ crudr.post('/completarorden/:id', async (req, res) => {
     connection = await poolPromise;
 
     // Obtener fecha actual en formato YYYY-MM-DD
-    const today = new Date().toISOString().slice(0, 10);
+    const today = fecha_recepcion
 
     // 1. Cambiar estado de la orden a 'completada' y asignar fecha_recepcion
     await connection.exec(`
