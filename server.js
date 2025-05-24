@@ -14,6 +14,8 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+import cookieParser from 'cookie-parser';
+app.use(cookieParser());
 app.use('/api/auth', twoFARoutes);
 
 // Configurar Morgan 

@@ -128,3 +128,9 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+#Sonar scanner
+.scannerwork
+
+#Local vscode extension settings
+.vscode
