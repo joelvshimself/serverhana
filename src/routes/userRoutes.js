@@ -9,6 +9,7 @@ import {
 } from '../controllers/userController.js';
 
 import { authenticateToken } from "../middleware/authMiddleware.js";
+import { auth } from "../middleware/auth.js"
 
 const router = express.Router();
 
@@ -44,7 +45,7 @@ const router = express.Router();
  *                     example: admin
  */
 
-router.get("/usuarios", authenticateToken, getUsers);
+router.get("/usuarios", auth(), getUsers);
 
 /**
  * @swagger
