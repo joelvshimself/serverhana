@@ -131,3 +131,6 @@ dist
 
 #Sonar scanner
 .scannerwork
+
+#Local vscode extension settings
+.vscode
