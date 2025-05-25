@@ -12,7 +12,13 @@ import inventarioRoutes from './src/routes/inventarioRoutes.js';
 dotenv.config();
 
 const app = express();
-app.use(cors());
+
+// Poner origin de produccion despues tambien
+app.use(cors({
+  origin: "http://localhost:5173", // frontend
+  credentials: true,               // allow sending cookies
+}));
+
 app.use(express.json());
 import cookieParser from 'cookie-parser';
 app.use(cookieParser());
