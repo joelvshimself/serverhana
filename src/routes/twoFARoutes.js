@@ -1,5 +1,6 @@
 import express from "express";
-import { generate2FA, verify2FA, check2FAStatus } from "../controllers/twoFAController.js";
+import { generate2FA, verify2FA, check2FAStatus, reset2FA } from "../controllers/twoFAController.js";
+import { auth } from "../middleware/auth.js"
 
 const router = express.Router();
 /**
@@ -11,30 +12,46 @@ const router = express.Router();
 
 /**
  * @swagger
+ * components:
+ *   securitySchemes:
+ *     cookieAuth:
+ *       type: apiKey
+ *       in: cookie
+ *       name: PreAuth
+ */
+
+/**
+ * @swagger
  * /api/auth/2fa/generate:
  *   post:
- *     summary: Genera código QR y secreto de 2FA para el usuario
+ *     summary: Genera código QR y secreto de 2FA para el usuario autenticado
  *     tags: [2FA]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               email:
- *                 type: string
+ *     security:
+ *       - cookieAuth: []
  *     responses:
  *       200:
  *         description: Secreto generado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 qr:
+ *                   type: string
+ *                   format: data-url
+ *                 otpauth_url:
+ *                   type: string
  */
 router.post("/2fa/generate", generate2FA);
+
 /**
  * @swagger
  * /api/auth/2fa/verify:
  *   post:
- *     summary: Verifica el código 2FA ingresado por el usuario
+ *     summary: Verifica el código 2FA ingresado por el usuario autenticado
  *     tags: [2FA]
+ *     security:
+ *       - cookieAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -42,8 +59,6 @@ router.post("/2fa/generate", generate2FA);
  *           schema:
  *             type: object
  *             properties:
- *               email:
- *                 type: string
  *               token:
  *                 type: string
  *     responses:
@@ -53,11 +68,33 @@ router.post("/2fa/generate", generate2FA);
  *         description: Código incorrecto
  */
 router.post("/2fa/verify", verify2FA);
+
 /**
  * @swagger
  * /api/auth/2fa/status:
  *   post:
- *     summary: Verifica si el usuario tiene activado 2FA
+ *     summary: Verifica si el usuario autenticado tiene activado 2FA
+ *     tags: [2FA]
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       200:
+ *         description: Estado de 2FA
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 twoFAEnabled:
+ *                   type: boolean
+ */
+router.post("/2fa/status", check2FAStatus);
+
+/**
+ * @swagger
+ * /api/auth/2fa/reset:
+ *   post:
+ *     summary: Resetea el secreto de 2FA de un usuario (admin)
  *     tags: [2FA]
  *     requestBody:
  *       required: true
@@ -70,8 +107,13 @@ router.post("/2fa/verify", verify2FA);
  *                 type: string
  *     responses:
  *       200:
- *         description: Estado de 2FA
+ *         description: 2FA reseteado exitosamente
+ *       400:
+ *         description: Email faltante
+ *       500:
+ *         description: Error en el servidor
  */
-router.post("/2fa/status", check2FAStatus);
+
+router.post("/2fa/reset", auth("admin"), reset2FA);
 
 export default router;
