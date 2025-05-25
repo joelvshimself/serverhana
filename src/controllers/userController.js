@@ -1,61 +1,49 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { poolPromise } from '../config/dbConfig.js';
+import jwt from "jsonwebtoken";
+import bcrypt from "bcryptjs";
+import { poolPromise } from "../config/dbConfig.js";
 
-// Login
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password) {
+    if (!email || !password)
       return res.status(400).json({ message: "Email y contraseña son obligatorios" });
-    }
 
     const conn = await poolPromise;
-
     const stmt = await conn.prepare('SELECT * FROM USUARIO WHERE "EMAIL" = ?');
     const result = await stmt.exec([email]);
 
-    if (!result || result.length === 0) {
+    if (!result || result.length === 0)
       return res.status(401).json({ message: "Credenciales incorrectas" });
-    }
 
     const user = result[0];
-
-    // Comparar contraseña
     const isMatch = await bcrypt.compare(password, user.PASSWORD);
-    if (!isMatch) {
+    if (!isMatch)
       return res.status(401).json({ message: "Credenciales incorrectas" });
-    }
 
-    // Verificar si tiene activado 2FA
     const has2FA = !!user.TWOFASECRET;
 
-    // Generar token
-    const token = jwt.sign(
-      { userId: user.ID, email: user.EMAIL, rol: user.ROL },
-      process.env.JWT_SECRET,
-      { expiresIn: "4h" }
-    );
-
-    res.cookie('Auth', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // Only over HTTPS in prod
-      sameSite: 'Lax',
-      maxAge: 60 * 60 * 1000 * 4 // 4 hours
-    });
-
-    // Enviar respuesta
-    res.json({
-      message: "Login exitoso",
-      token,
-      user: {
-        id: user.ID,
-        nombre: user.NOMBRE,
+    const tempToken = jwt.sign(
+      {
+        userId: user.ID,
         email: user.EMAIL,
         rol: user.ROL,
-        twoFAEnabled: has2FA // 👈 Este campo lo usas en el frontend
-      }
+        twoFAEnabled: has2FA,
+        step: "pre-2fa"
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    res.cookie("PreAuth", tempToken, {
+      httpOnly: true,
+      sameSite: "Lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 15 * 60 * 1000 // 15 minutes
+    });
+
+    res.json({
+      message: "Credenciales válidas, esperando verificación 2FA",
+      twoFAEnabled: has2FA
     });
 
   } catch (error) {
@@ -64,7 +52,32 @@ export const loginUser = async (req, res) => {
   }
 };
 
-//G
+export const checkAuth = (req, res) => {
+  const token = req.cookies?.Auth;
+
+  if (!token) {
+    return res.status(401).json({ message: "No autenticado" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    res.status(200).json({ authenticated: true, user: decoded });
+  } catch (error) {
+    console.error("Token inválido:", error);
+    res.status(401).json({ message: "Token inválido o expirado" });
+  }
+};
+
+export const logoutUser = (req, res) => {
+  res.clearCookie("Auth", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "Lax",
+  });
+
+  res.status(200).json({ message: "Sesión cerrada" });
+};
+
 export const getUsers = async (req, res) => {
   try {
     const conn = await poolPromise;

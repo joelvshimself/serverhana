@@ -5,7 +5,9 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  loginUser
+  loginUser,
+  checkAuth,
+  logoutUser
 } from '../controllers/userController.js';
 
 import { auth } from "../middleware/auth.js"
@@ -230,5 +232,7 @@ router.post('/login', loginUser);
 
 router.delete("/usuarios/:id", auth(), deleteUser);
 
+router.get("/check-auth", checkAuth);
+router.post("/logout", logoutUser);
 
 export default router;
