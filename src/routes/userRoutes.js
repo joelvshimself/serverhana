@@ -5,10 +5,12 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  loginUser
+  loginUser,
+  checkAuth,
+  logoutUser
 } from '../controllers/userController.js';
 
-import { authenticateToken } from "../middleware/authMiddleware.js";
+import { auth } from "../middleware/auth.js"
 
 const router = express.Router();
 
@@ -44,7 +46,7 @@ const router = express.Router();
  *                     example: admin
  */
 
-router.get("/usuarios", authenticateToken, getUsers);
+router.get("/usuarios", auth(), getUsers);
 
 /**
  * @swagger
@@ -66,7 +68,7 @@ router.get("/usuarios", authenticateToken, getUsers);
  *       404:
  *         description: Usuario no encontrado.
  */
-router.get("/usuarios/:id", authenticateToken, getUserById);
+router.get("/usuarios/:id", auth(), getUserById);
 
 /**
  * @swagger
@@ -128,7 +130,7 @@ router.post("/usuarios", createUser);
  *       200:
  *         description: Usuario actualizado correctamente.
  */
-router.put("/usuarios/:id", authenticateToken, updateUser);
+router.put("/usuarios/:id", auth("admin"), updateUser);
 
 /**
  * @swagger
@@ -228,7 +230,9 @@ router.post('/login', loginUser);
  *         description: No autorizado, token inválido o ausente.
  */
 
-router.delete("/usuarios/:id", authenticateToken, deleteUser);
+router.delete("/usuarios/:id", auth(), deleteUser);
 
+router.get("/check-auth", checkAuth);
+router.post("/logout", logoutUser);
 
 export default router;

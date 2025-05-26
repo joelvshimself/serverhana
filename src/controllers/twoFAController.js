@@ -1,65 +1,127 @@
 import speakeasy from "speakeasy";
 import qrcode from "qrcode";
 import { poolPromise } from "../config/dbConfig.js";
+import jwt from 'jsonwebtoken';
 
 export const generate2FA = async (req, res) => {
-  const { email } = req.body;
-  const conn = await poolPromise;
+  try {
+    const preAuthToken = req.cookies?.PreAuth;
+    if (!preAuthToken)
+      return res.status(401).json({ message: "Falta token PreAuth" });
 
-  // Generar el secreto
-  const secret = speakeasy.generateSecret({ name: `ViBa (${email})` });
+    const decoded = jwt.verify(preAuthToken, process.env.JWT_SECRET);
+    const { email } = decoded;
 
-  // Guardar el secreto en SAP HANA
-  const stmt = await conn.prepare(`
-    UPDATE USUARIO SET "TWOFASECRET" = ? WHERE "EMAIL" = ?
-  `);
-  await stmt.exec([secret.base32, email]);
+    if (!email)
+      return res.status(400).json({ message: "Token inválido: falta email" });
 
-  // Generar QR para Google Authenticator
-  const qr = await qrcode.toDataURL(secret.otpauth_url);
-  res.json({ qr });
-};
-export const verify2FA = async (req, res) => {
-    const { email, token } = req.body;
     const conn = await poolPromise;
-  
-    // Obtener el secreto del usuario
+
+    const secret = speakeasy.generateSecret({ name: `ViBa (${email})` });
+
     const stmt = await conn.prepare(`
-      SELECT "TWOFASECRET" FROM USUARIO WHERE "EMAIL" = ?
+      UPDATE USUARIO SET "TWOFASECRET" = ? WHERE "EMAIL" = ?
     `);
-    const result = await stmt.exec([email]);
-  
-    if (!result || result.length === 0 || !result[0].TWOFASECRET) {
-      return res.status(400).json({ success: false, message: "2FA no activado" });
-    }
-  
+    await stmt.exec([secret.base32, email]);
+
+    const qr = await qrcode.toDataURL(secret.otpauth_url);
+    res.json({ qr, otpauth_url: secret.otpauth_url });
+
+  } catch (err) {
+    console.error("Error en generate2FA:", err);
+    res.status(500).json({ message: "Error generando 2FA" });
+  }
+};
+
+
+export const verify2FA = async (req, res) => {
+  try {
+    const preAuthToken = req.cookies?.PreAuth;
+
+    if (!preAuthToken)
+      return res.status(401).json({ message: "Falta token PreAuth" });
+
+    const decoded = jwt.verify(preAuthToken, process.env.JWT_SECRET);
+    if (decoded.step !== "pre-2fa")
+      return res.status(401).json({ message: "Token inválido para 2FA" });
+
+    const { token } = req.body; 
+    if (!token)
+      return res.status(400).json({ message: "Falta código 2FA" });
+
+    const conn = await poolPromise;
+    const stmt = await conn.prepare(`SELECT * FROM USUARIO WHERE "EMAIL" = ?`);
+    const result = await stmt.exec([decoded.email]);
+
+    if (!result || result.length === 0)
+      return res.status(404).json({ message: "Usuario no encontrado" });
+
+    const user = result[0];
     const verified = speakeasy.totp.verify({
-      secret: result[0].TWOFASECRET,
+      secret: user.TWOFASECRET,
       encoding: "base32",
       token,
-      window: 1,
+      window: 1
     });
-  
-    if (verified) {
-      res.json({ success: true });
-    } else {
-      res.status(401).json({ success: false, message: "Código incorrecto" });
-    }
-  };
+
+    if (!verified)
+      return res.status(401).json({ message: "Código 2FA inválido" });
+
+    const finalToken = jwt.sign(
+      { userId: user.ID, email: user.EMAIL, rol: user.ROL },
+      process.env.JWT_SECRET,
+      { expiresIn: "4h" }
+    );
+
+    res.clearCookie("PreAuth");
+    res.cookie("Auth", finalToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 4 * 60 * 60 * 1000
+    });
+
+    res.json({ message: "2FA exitoso", success: true });
+
+  } catch (err) {
+    console.error("Error en verify2FA:", err);
+    res.status(500).json({ message: "Error al verificar 2FA" });
+  }
+};
+
   export const check2FAStatus = async (req, res) => {
-    const { email } = req.body;
-    const conn = await poolPromise;
-  
-    const stmt = await conn.prepare(`
-      SELECT "TWOFASECRET" FROM USUARIO WHERE "EMAIL" = ?
-    `);
-    const result = await stmt.exec([email]);
+    const preAuthToken = req.cookies?.PreAuth;
+    if (!preAuthToken)
+      return res.status(401).json({ message: "Falta token PreAuth" });
+
+    const decoded = jwt.verify(preAuthToken, process.env.JWT_SECRET);
+    //console.log(decoded)
+    
+    const result = decoded.twoFAEnabled
   
     if (!result || result.length === 0) {
       return res.status(404).json({ success: false, message: "Usuario no encontrado" });
     }
   
-    const isActive = !!result[0].TWOFASECRET;
-    res.json({ twoFAEnabled: isActive });
+    res.json({ twoFAEnabled: result });
   };
-  
+
+export const reset2FA = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email)
+      return res.status(400).json({ message: "Email es requerido" });
+
+    const conn = await poolPromise;
+    const stmt = await conn.prepare(`
+      UPDATE USUARIO SET "TWOFASECRET" = NULL WHERE "EMAIL" = ?
+    `);
+    const result = await stmt.exec([email]);
+
+    res.json({ message: `2FA reseteado para ${email}` });
+  } catch (error) {
+    console.error("Error en reset2FA:", error);
+    res.status(500).json({ message: "Error al resetear 2FA" });
+  }
+};
