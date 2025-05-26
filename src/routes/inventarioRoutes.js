@@ -1,6 +1,5 @@
-// server/src/routes/inventarioRoutes.js
 import { Router } from "express";
-import { poolPromise } from '../config/dbConfig.js';
+import { poolPromise } from "../config/dbConfig.js";
 
 const router = Router();
 
@@ -8,7 +7,7 @@ const router = Router();
  * @swagger
  * tags:
  *   name: Inventario
- *   description: Gestión de inventario disponible
+ *   description: Gestión de inventario
  */
 
 /**
@@ -16,7 +15,7 @@ const router = Router();
  * /api/inventario:
  *   get:
  *     summary: Obtener inventario disponible
- *     description: Devuelve la cantidad de unidades disponibles agrupadas por producto.
+ *     description: Devuelve la cantidad de unidades **disponibles** agrupadas por producto.
  *     tags:
  *       - Inventario
  *     responses:
@@ -31,10 +30,8 @@ const router = Router();
  *                 properties:
  *                   PRODUCTO:
  *                     type: string
- *                     description: Nombre del producto.
  *                   CANTIDAD:
  *                     type: integer
- *                     description: Cantidad disponible.
  *       500:
  *         description: Error interno del servidor.
  */
@@ -50,7 +47,49 @@ router.get("/", async (req, res) => {
     `);
     res.json(result);
   } catch (error) {
-    console.error("Error al obtener inventario:", error);
+    console.error("Error al obtener inventario disponible:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * @swagger
+ * /api/inventario/vendido:
+ *   get:
+ *     summary: Obtener inventario vendido
+ *     description: Devuelve la cantidad de unidades que han sido **vendidas** agrupadas por producto.
+ *     tags:
+ *       - Inventario
+ *     responses:
+ *       200:
+ *         description: Lista de productos y su cantidad vendida.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   PRODUCTO:
+ *                     type: string
+ *                   CANTIDAD:
+ *                     type: integer
+ *       500:
+ *         description: Error interno del servidor.
+ */
+router.get("/vendido", async (req, res) => {
+  try {
+    const connection = await poolPromise;
+    const result = await connection.exec(`
+      SELECT PRODUCTO,
+             COUNT(*) AS CANTIDAD
+      FROM INVENTARIO
+      WHERE TIPO_MOVIMIENTO = 'salida por venta'
+      GROUP BY PRODUCTO
+    `);
+    res.json(result);
+  } catch (error) {
+    console.error("Error al obtener inventario vendido:", error);
     res.status(500).json({ error: error.message });
   }
 });
