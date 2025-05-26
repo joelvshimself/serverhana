@@ -117,7 +117,7 @@ export const reset2FA = async (req, res) => {
     const stmt = await conn.prepare(`
       UPDATE USUARIO SET "TWOFASECRET" = NULL WHERE "EMAIL" = ?
     `);
-    const result = await stmt.exec([email]);
+    await stmt.exec([email]);
 
     res.json({ message: `2FA reseteado para ${email}` });
   } catch (error) {
