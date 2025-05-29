@@ -885,7 +885,49 @@ crudr.post('/notificaciones', async (req, res) => {
     res.status(500).json({ error: 'Error al crear notificación', detail: error.message });
   }
 });
-
+/**
+ * @swagger
+ * /api/forecast:
+ *   get:
+ *     summary: Obtener todos los registros de Forecast_Data
+ *     tags: [temporal]
+ *     responses:
+ *       200:
+ *         description: Lista de pronósticos
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   Time:
+ *                     type: string
+ *                     format: date
+ *                   Forecast:
+ *                     type: number
+ *                   Prediction_Interval_Max:
+ *                     type: number
+ *                   Prediction_Interval_Min:
+ *                     type: number
+ *       500:
+ *         description: Error al obtener los datos de pronóstico
+ */
+crudr.get('/forecast', async (req, res) => {
+  let connection;
+  try {
+    connection = await poolPromise;
+    const result = await connection.exec(`
+      SELECT Time, Forecast, Prediction_Interval_Max, Prediction_Interval_Min
+      FROM Forecast_Data
+      ORDER BY Time DESC
+    `);
+    res.status(200).json(result);
+  } catch (error) {
+    console.error('Error al obtener datos de pronóstico:', error);
+    res.status(500).json({ error: 'Error al obtener datos de pronóstico', detail: error.message });
+  }
+});
 // GET: Obtener todas las notificaciones
 crudr.get('/notificaciones', async (req, res) => {
   let connection;
@@ -906,6 +948,7 @@ crudr.get('/notificaciones', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener notificaciones', detail: error.message });
   }
 });
+
 
 
 
