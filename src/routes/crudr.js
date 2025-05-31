@@ -1,6 +1,7 @@
 import express from 'express';
 import { poolPromise } from '../config/dbConfig.js';
 
+import { auth } from "../middleware/auth.js"
 
 const crudr = express.Router();
 
@@ -90,7 +91,7 @@ const crudr = express.Router();
  */
 
 
-crudr.post('/nuevaorden', async (req, res) => {
+crudr.post('/nuevaorden', auth("detallista"), async (req, res) => {
   const { correo_solicita, correo_provee, productos, fecha_emision } = req.body;
 
   if (!correo_solicita || !correo_provee || !fecha_emision || !Array.isArray(productos)) {
@@ -224,7 +225,7 @@ crudr.post('/nuevaorden', async (req, res) => {
  *         description: Error interno al completar la orden
  */
 
-crudr.post('/completarorden/:id', async (req, res) => {
+crudr.post('/completarorden/:id', auth("detallista"), async (req, res) => {
   const { fecha_recepcion } = req.body;
   const ordenId = req.params.id;
   let connection;
@@ -366,7 +367,7 @@ crudr.post('/completarorden/:id', async (req, res) => {
  *         description: Error interno al procesar la venta
  */
 
-crudr.post('/vender', async (req, res) => {
+crudr.post('/vender', auth("detallista"), async (req, res) => {
   const { fecha_emision, productos } = req.body;
   let connection;
 
@@ -515,7 +516,7 @@ crudr.post('/vender', async (req, res) => {
  *         description: Lista de ventas
  */
 
-crudr.get("/ventas", async (req, res) => {
+crudr.get("/ventas", auth("detallista"), async (req, res) => {
   let connection;
   try {
     connection = await poolPromise;
@@ -572,7 +573,7 @@ crudr.get("/ventas", async (req, res) => {
  *         description: Error interno del servidor
  */
 
-crudr.delete("/ventas/:id", async (req, res) => {
+crudr.delete("/ventas/:id", auth("detallista"), async (req, res) => {
   const ventaId = req.params.id;
   let connection;
 
@@ -637,7 +638,7 @@ crudr.delete("/ventas/:id", async (req, res) => {
  *         description: Error del servidor
  */
 
-crudr.put("/ventas/:id", async (req, res) => {
+crudr.put("/ventas/:id", auth("detallista"), async (req, res) => {
   const ventaId = req.params.id;
   const { productos } = req.body;
 
@@ -707,7 +708,7 @@ crudr.put("/ventas/:id", async (req, res) => {
  *       200:
  *         description: Lista de órdenes
  */
-crudr.get("/ordenes", async (req, res) => {
+crudr.get("/ordenes", auth("detallista", "proveedor"), async (req, res) => {
   try {
     const connection = await poolPromise;
 
@@ -734,7 +735,7 @@ crudr.get("/ordenes", async (req, res) => {
   }
 });
 
-crudr.delete("/ordenes/:id", async (req, res) => {
+crudr.delete("/ordenes/:id", auth("detallista"), async (req, res) => {
   try {
     const id = req.params.id;
     const connection = await poolPromise;
@@ -751,7 +752,7 @@ crudr.delete("/ordenes/:id", async (req, res) => {
 });
 
 
-crudr.put("/ordenes/:id", async (req, res) => {
+crudr.put("/ordenes/:id", auth("detallista"), async (req, res) => {
   try {
     const id = req.params.id;
     const {
@@ -862,7 +863,7 @@ crudr.put("/ordenes/:id", async (req, res) => {
 // ==== NOTIFICACIONES ====
 
 // POST: Crear una nueva notificación
-crudr.post('/notificaciones', async (req, res) => {
+crudr.post('/notificaciones', auth(), async (req, res) => {
   const { mensaje, tipo, id_usuario } = req.body;
   let connection;
 
@@ -887,7 +888,7 @@ crudr.post('/notificaciones', async (req, res) => {
 });
 
 // GET: Obtener todas las notificaciones
-crudr.get('/notificaciones', async (req, res) => {
+crudr.get('/notificaciones', auth("detallista"), async (req, res) => {
   let connection;
 
   try {
@@ -906,10 +907,5 @@ crudr.get('/notificaciones', async (req, res) => {
     res.status(500).json({ error: 'Error al obtener notificaciones', detail: error.message });
   }
 });
-
-
-
-
-
 
 export default crudr;

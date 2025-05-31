@@ -96,7 +96,7 @@ router.get("/usuarios/:id", auth(), getUserById);
  *       201:
  *         description: Usuario creado exitosamente.
  */
-router.post("/usuarios", createUser);
+router.post("/usuarios", auth("admin"), createUser);
 
 /**
  * @swagger
