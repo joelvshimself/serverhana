@@ -863,7 +863,7 @@ crudr.put("/ordenes/:id", auth("detallista"), async (req, res) => {
 // ==== NOTIFICACIONES ====
 
 // POST: Crear una nueva notificación
-crudr.post('/notificaciones', auth(), async (req, res) => {
+crudr.post('/notificaciones', auth("detallista", "owner"), async (req, res) => {
   const { mensaje, tipo, id_usuario } = req.body;
   let connection;
 
@@ -914,7 +914,7 @@ crudr.post('/notificaciones', auth(), async (req, res) => {
  *       500:
  *         description: Error al obtener los datos de pronóstico
  */
-crudr.get('/forecast', async (req, res) => {
+crudr.get('/forecast', auth("owner", "detallista"), async (req, res) => {
   let connection;
   try {
     connection = await poolPromise;
@@ -930,7 +930,7 @@ crudr.get('/forecast', async (req, res) => {
   }
 });
 // GET: Obtener todas las notificaciones
-crudr.get('/notificaciones', auth("detallista"), async (req, res) => {
+crudr.get('/notificaciones', auth("detallista", "owner"), async (req, res) => {
   let connection;
 
   try {

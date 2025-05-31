@@ -47,7 +47,7 @@ const router = express.Router();
  *                     example: admin
  */
 
-router.get("/usuarios", auth(), getUsers);
+router.get("/usuarios", auth("admin"), getUsers);
 
 /**
  * @swagger
@@ -69,7 +69,7 @@ router.get("/usuarios", auth(), getUsers);
  *       404:
  *         description: Usuario no encontrado.
  */
-router.get("/usuarios/:id", auth(), getUserById);
+router.get("/usuarios/:id", auth("admin"), getUserById);
 
 /**
  * @swagger
@@ -231,7 +231,7 @@ router.post('/login', loginUser);
  *         description: No autorizado, token inválido o ausente.
  */
 
-router.delete("/usuarios/:id", auth(), deleteUser);
+router.delete("/usuarios/:id", auth("admin"), deleteUser);
 
 /**
  * @swagger
