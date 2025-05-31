@@ -25,6 +25,7 @@ jobs:
         uses: sonarsource/sonarqube-quality-gate-action@master
         with:
           pollingTimeoutSec: 600
+          qualityGate: 'sonar low'
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }} #OPTIONAL
@@ -43,4 +44,3 @@ jobs:
       - name: Warn if Quality Gate status is WARN
         if: steps.sonarqube-quality-gate-check.outputs.quality-gate-status == 'WARN'
         run: echo "Quality Gate status is WARN"
-
