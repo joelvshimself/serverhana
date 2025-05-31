@@ -11,6 +11,8 @@ app.use(express.json());
 // Simulamos rutas con los controladores
 app.post('/api/login', userController.loginUser);
 app.put('/api/users/:id', userController.updateUser);
+app.delete('/api/users/:id', userController.deleteUser);
+app.post('/api/users', userController.createUser);
 
 jest.mock('bcryptjs');
 
@@ -263,6 +265,136 @@ describe('UserController', () => {
       const res = await request(app).get('/api/user-info-none');
       expect(res.status).toBe(401);
       expect(res.body.message).toBe('No token');
+    });
+  });
+
+  describe('DELETE /api/users/:id', () => {
+    it('should return 404 if user to delete is not found', async () => {
+      const mockPrepare = jest.fn().mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue([]) // No hay usuario
+      }));
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve({ prepare: mockPrepare });
+
+      app.delete('/api/users/:id', userController.deleteUser);
+
+      const res = await request(app).delete('/api/users/999');
+      expect(res.status).toBe(404);
+      expect(res.body.message).toMatch(/no encontrado/i);
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
+    });
+
+    it('should delete user and return success message', async () => {
+      const mockPrepare = jest.fn()
+        .mockImplementationOnce(() => ({
+          exec: jest.fn().mockResolvedValue([{ ID_USUARIO: 1 }]) // Usuario existe
+        }))
+        .mockImplementationOnce(() => ({
+          exec: jest.fn().mockResolvedValue() // Eliminación exitosa
+        }));
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve({ prepare: mockPrepare });
+
+      app.delete('/api/users/:id', userController.deleteUser);
+
+      const res = await request(app).delete('/api/users/1');
+      expect(res.status).toBe(200);
+      expect(res.body.message).toMatch(/eliminado/i);
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
+    });
+  });
+
+  describe('GET /api/users/:id', () => {
+    it('should return 404 if user is not found', async () => {
+      const mockPrepare = jest.fn().mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue([]) // No hay usuario
+      }));
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve({ prepare: mockPrepare });
+
+      app.get('/api/users/:id', userController.getUserById);
+
+      const res = await request(app).get('/api/users/999');
+      expect(res.status).toBe(404);
+      expect(res.body.message).toMatch(/no encontrado/i);
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
+    });
+  });
+
+  describe('POST /api/users', () => {
+    it('should return 400 if password is missing', async () => {
+      app.post('/api/users', userController.createUser);
+      const res = await request(app).post('/api/users').send({ nombre: 'Test', email: 'test@x.com', rol: 'user' });
+      expect(res.status).toBe(400);
+      expect(res.body.message).toMatch(/contraseña.*obligatoria/i);
+    });
+
+    it('should create user and return 201', async () => {
+      bcrypt.genSalt.mockResolvedValue('salt');
+      bcrypt.hash.mockResolvedValue('hashedPassword');
+      const mockExec = jest.fn().mockResolvedValue();
+      const mockPool = {
+        exec: mockExec
+      };
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve(mockPool);
+
+      app.post('/api/users', userController.createUser);
+
+      const res = await request(app).post('/api/users').send({
+        nombre: 'Test',
+        email: 'test@x.com',
+        password: '123',
+        rol: 'user'
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.message).toMatch(/creado/i);
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
+    });
+  });
+
+  describe('GET /api/users', () => {
+    it('should return all users', async () => {
+      const mockUsers = [{ ID: 1, EMAIL: 'a' }, { ID: 2, EMAIL: 'b' }];
+      const mockPrepare = jest.fn().mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue(mockUsers)
+      }));
+      const mockPool = { prepare: mockPrepare };
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve(mockPool);
+
+      app.get('/api/users', userController.getUsers);
+
+      const res = await request(app).get('/api/users');
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual(mockUsers);
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
+    });
+
+    it('should return 500 on db error', async () => {
+      const mockPrepare = jest.fn().mockImplementation(() => { throw new Error('DB error'); });
+      const mockPool = { prepare: mockPrepare };
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve(mockPool);
+
+      app.get('/api/users', userController.getUsers);
+
+      const res = await request(app).get('/api/users');
+      expect(res.status).toBe(500);
+      expect(res.body.message).toMatch(/db error/i);
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
     });
   });
 });
