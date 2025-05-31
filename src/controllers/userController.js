@@ -72,6 +72,7 @@ export const authStatus = async (req, res) => {
     return res.json({ authStatus: "none" });
 
   } catch (err) {
+    console.error("Error en authStatus:", err);
     return res.json({ authStatus: "none" });
   }
 };
@@ -102,6 +103,7 @@ export const getUserInfo = (req, res) => {
     return res.status(401).json({ message: "No token" });
 
   } catch (err) {
+    console.error("Error en getUserInfo:", err);
     return res.status(401).json({ message: "Invalid token" });
   }
 };
