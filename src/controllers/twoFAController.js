@@ -81,13 +81,25 @@ export const verify2FA = async (req, res) => {
       maxAge: 4 * 60 * 60 * 1000
     });
 
+    res.cookie("UserData", JSON.stringify({
+      userId: user.ID,
+      email: user.EMAIL,
+      role: user.ROL,
+      nombre: user.NOMBRE
+    }), {
+      httpOnly: false, // accesible by js
+      sameSite: "Lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 4 * 60 * 60 * 1000 
+    });
+
     res.json({ message: "2FA exitoso", success: true });
 
   } catch (err) {
     console.error("Error en verify2FA:", err);
     res.status(500).json({ message: "Error al verificar 2FA" });
   }
-};
+}; 
 
   export const check2FAStatus = async (req, res) => {
     const preAuthToken = req.cookies?.PreAuth;
