@@ -209,6 +209,10 @@ describe('UserController', () => {
   });
 
   describe('GET /api/auth-status', () => {
+    beforeAll(() => {
+      process.env.JWT_SECRET = 'testsecret';
+    });
+
     it('should return authenticated if Auth cookie is valid', async () => {
       const token = jwt.sign({ userId: 1, email: 'a', rol: 'user' }, process.env.JWT_SECRET);
       app.get('/api/auth-status', (req, res) => {
@@ -227,6 +231,15 @@ describe('UserController', () => {
       });
       const res = await request(app).get('/api/auth-status-pre');
       expect(res.body.authStatus).toBe('pre-2fa');
+    });
+
+    it('should return none if no cookies are present', async () => {
+      app.get('/api/auth-status-none', (req, res) => {
+        req.cookies = {};
+        userController.authStatus(req, res);
+      });
+      const res = await request(app).get('/api/auth-status-none');
+      expect(res.body.authStatus).toBe('none');
     });
   });
 
