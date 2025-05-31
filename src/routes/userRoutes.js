@@ -6,7 +6,8 @@ import {
   updateUser,
   deleteUser,
   loginUser,
-  checkAuth,
+  authStatus,
+  getUserInfo,
   logoutUser
 } from '../controllers/userController.js';
 
@@ -232,7 +233,88 @@ router.post('/login', loginUser);
 
 router.delete("/usuarios/:id", auth(), deleteUser);
 
-router.get("/check-auth", checkAuth);
+/**
+ * @swagger
+ * /api/check-auth:
+ *   get:
+ *     summary: Check authentication status
+ *     tags:
+ *       - Auth
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       '200':
+ *         description: Authentication status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 authStatus:
+ *                   type: string
+ *                   enum: [authenticated, pre-2fa, none]
+ *                   example: authenticated
+ */
+router.get("/check-auth", auth(), authStatus);
+
+/**
+ * @swagger
+ * /api/logout:
+ *   post:
+ *     summary: Logout user
+ *     tags:
+ *       - Auth
+ *     responses:
+ *       '200':
+ *         description: Session closed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Sesión cerrada"
+ */
 router.post("/logout", logoutUser);
+
+/**
+ * @swagger
+ * /api/user-info:
+ *   get:
+ *     summary: Get authenticated user's info
+ *     tags:
+ *       - Auth
+ *     security:
+ *       - cookieAuth: []
+ *     responses:
+ *       '200':
+ *         description: Authenticated user info
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 email:
+ *                   type: string
+ *                   example: "user@example.com"
+ *                 role:
+ *                   type: string
+ *                   example: "admin"
+ *                 userId:
+ *                   type: integer
+ *                   example: 123
+ *       '401':
+ *         description: Unauthorized or invalid token
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Invalid token"
+ */
+router.get("/user-info", getUserInfo);
 
 export default router;
