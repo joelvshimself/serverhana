@@ -52,19 +52,57 @@ export const loginUser = async (req, res) => {
   }
 };
 
-export const checkAuth = (req, res) => {
-  const token = req.cookies?.Auth;
-
-  if (!token) {
-    return res.status(401).json({ message: "No autenticado" });
-  }
-
+export const authStatus = async (req, res) => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    res.status(200).json({ authenticated: true, user: decoded });
-  } catch (error) {
-    console.error("Token inválido:", error);
-    res.status(401).json({ message: "Token inválido o expirado" });
+    const preAuth = req.cookies?.PreAuth;
+    const auth = req.cookies?.Auth;
+
+    if (auth) {
+      jwt.verify(auth, process.env.JWT_SECRET);
+      return res.json({ authStatus: "authenticated" });
+    }
+
+    if (preAuth) {
+      const decoded = jwt.verify(preAuth, process.env.JWT_SECRET);
+      if (decoded.step === "pre-2fa") {
+        return res.json({ authStatus: "pre-2fa" });
+      }
+    }
+
+    return res.json({ authStatus: "none" });
+
+  } catch (err) {
+    return res.json({ authStatus: "none" });
+  }
+};
+
+export const getUserInfo = (req, res) => {
+  try {
+    const token = req.cookies?.Auth;
+    if(token){
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+      return res.json({
+        email: decoded.email,
+        role: decoded.rol,
+        userId: decoded.userId,
+        twoFa: true
+      });
+    }
+    const twofatoken = req.cookies?.PreAuth;
+    if(twofatoken){
+      const decoded = jwt.verify(twofatoken, process.env.JWT_SECRET);
+      return res.json({
+        email: decoded.email,
+        role: decoded.rol,
+        userId: decoded.userId,
+        twoFa: false
+      })
+    }
+    return res.status(401).json({ message: "No token" });
+
+  } catch (err) {
+    return res.status(401).json({ message: "Invalid token" });
   }
 };
 
@@ -74,6 +112,12 @@ export const logoutUser = (req, res) => {
     secure: process.env.NODE_ENV === "production",
     sameSite: "Lax",
   });
+
+  res.clearCookie("UserData", {
+      httpOnly: false, // accesible by js
+      sameSite: "Lax",
+      secure: process.env.NODE_ENV === "production",
+    });
 
   res.status(200).json({ message: "Sesión cerrada" });
 };
