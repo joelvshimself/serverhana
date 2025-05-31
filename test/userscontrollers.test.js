@@ -3,15 +3,53 @@ import express from 'express';
 import * as userController from '../src/controllers/userController.js';  // Importa todo el controlador
 import bcrypt from 'bcryptjs';
 
-// Creamos una app Express solo para pruebas
+jest.mock('bcryptjs');
+
+// Mock poolPromise y la conexión
+const mockPrepare = jest.fn();
+jest.mock('../src/config/dbConfig.js', () => ({
+  poolPromise: Promise.resolve({
+    prepare: mockPrepare
+  })
+}));
+
 const app = express();
 app.use(express.json());
+app.use('/api', userRoutes);
 
-// Simulamos rutas con los controladores
-app.post('/api/login', userController.loginUser);
-app.put('/api/users/:id', userController.updateUser);
+describe('UserRoutes /api/login', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
 
-jest.mock('bcryptjs');
+  it('should return 401 if user not found', async () => {
+    mockPrepare.mockResolvedValue({ exec: jest.fn().mockResolvedValue([]) });
+
+    const res = await request(app)
+      .post('/api/login')
+      .send({ email: 'notfound@example.com', password: '123' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe('Credenciales incorrectas');
+  });
+
+  it('should return 401 if password is incorrect', async () => {
+    mockPrepare.mockResolvedValue({ exec: jest.fn().mockResolvedValue([{
+      ID: 1,
+      EMAIL: 'test@example.com',
+      PASSWORD: 'hashed',
+      TWOFASECRET: null
+    }]) });
+    bcrypt.compare.mockResolvedValue(false);
+
+    const res = await request(app)
+      .post('/api/login')
+      .send({ email: 'test@example.com', password: 'wrong' });
+
+    expect(res.status).toBe(401);
+    expect(res.body.message).toBe('Credenciales incorrectas');
+  });
+});
 
 describe('UserController', () => {
   describe('POST /api/login', () => {
