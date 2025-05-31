@@ -1,38 +1,36 @@
 import { exec } from 'child_process';
 import { mkdirSync, existsSync, createWriteStream } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { join } from 'path';
 
-// Obtén el directorio actual usando ES Modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Timestamp con formato seguro para nombres de archivo
-const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-
-// Define directorio y archivos de salida
-const logDir = join(__dirname, "/logs/test-runs");
-const logFile = join(logDir, `test-log-${timestamp}.log`);
-const jsonFile = join(logDir, `test-report-${timestamp}.json`);
-
-// Crea el directorio si no existe
+// Configura carpeta de logs
+const logDir = './logs/test-runs';
 if (!existsSync(logDir)) mkdirSync(logDir, { recursive: true });
 
-// Comando para correr Jest con cobertura y generar JSON
+// Timestamp único para diferenciar cada corrida
+const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+const jsonFile = join(logDir, `test-report-${timestamp}.json`);
+const logFile = join(logDir, `test-log-${timestamp}.log`);
+
+// Comando Jest con cobertura y salida JSON
 const cmd = `npx jest --coverage --json --outputFile=${jsonFile}`;
+console.log(`🧪 Ejecutando pruebas Jest...\n📦 JSON: ${jsonFile}\n📜 LOG: ${logFile}`);
 
-console.log(`🧪 Ejecutando pruebas Jest...
-🗂️ Guardando log en: ${logFile}
-📦 Guardando reporte JSON en: ${jsonFile}
-`);
-
+// Crea stream para guardar el log
 const stream = createWriteStream(logFile);
-const child = exec(cmd);
 
-// Redirige stdout y stderr al log
+// Ejecuta Jest y redirige salida y errores al log
+const child = exec(cmd, (error, stdout, stderr) => {
+  // También mostrar salida en consola
+  if (stdout) console.log(stdout);
+  if (stderr) console.error(stderr);
+  if (error) console.error(`Error: ${error.message}`);
+});
+
+// Redirige stdout y stderr al archivo log
 child.stdout.pipe(stream);
 child.stderr.pipe(stream);
 
-child.on("exit", code => {
-  console.log(`✅ Pruebas terminadas con código: ${code}`);
+// Cuando termina, informa por consola
+child.on('exit', code => {
+  console.log(`✅ Pruebas finalizadas con código: ${code}`);
 });
