@@ -173,7 +173,7 @@ describe('CRUDR Ventas', () => {
 
     const res = await request(app).get('/crud/ventas');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/ventas/i);
+    expect(res.body.error).toMatch(/obtener ventas/i); // <-- igual que el backend
   });
 
   it('should delete venta', async () => {
@@ -251,7 +251,7 @@ describe('CRUDR Notificaciones', () => {
       tipo: 'orden'
     });
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/crear notificación/i);
+    expect(res.body.error).toMatch(/crear notificación/i); // <-- igual que el backend
   });
 
   it('should return all notificaciones', async () => {
@@ -273,7 +273,7 @@ describe('CRUDR Notificaciones', () => {
 
     const res = await request(app).get('/crud/notificaciones');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/obtener notificaciones/i);
+    expect(res.body.error).toMatch(/obtener notificaciones/i); // <-- igual que el backend
   });
 });
 
@@ -296,7 +296,7 @@ describe('CRUDR Ordenes', () => {
 
     const res = await request(app).get('/crud/ordenes');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/ordenes/i);
+    expect(res.body.error).toMatch(/obtener órdenes/i); // <-- con tilde
   });
 
   it('should delete orden and suborden', async () => {
@@ -314,7 +314,7 @@ describe('CRUDR Ordenes', () => {
 
     const res = await request(app).delete('/crud/ordenes/1');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/eliminar orden/i);
+    expect(res.body.error).toMatch(/eliminar orden/i); // <-- igual que el backend
   });
 
   it('should update orden', async () => {
@@ -343,7 +343,7 @@ describe('CRUDR Ordenes', () => {
       estado: 'completada'
     });
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/actualizar orden/i);
+    expect(res.body.error).toMatch(/actualizar orden/i); // <-- igual que el backend
   });
 });
 
@@ -365,7 +365,7 @@ describe('CRUDR Forecast', () => {
 
     const res = await request(app).get('/crud/forecast');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/pronóstico/i);
+    expect(res.body.error).toMatch(/obtener datos de pronóstico/i); // <-- igual que el backend
   });
 });
 

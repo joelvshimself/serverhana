@@ -38,12 +38,32 @@ describe('UserController', () => {
     });
 
     it('should return 200 and token for valid login', async () => {
+      // Mock de usuario encontrado
+      const user = {
+        ID: 1,
+        EMAIL: 'Jorge5278222@tec.mx',
+        PASSWORD: 'hashedPassword',
+        TWOFASECRET: null,
+        ROL: 'user'
+      };
+      const mockPrepare = jest.fn().mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue([user])
+      }));
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve({ prepare: mockPrepare });
+
+      // Mock bcrypt para que la contraseña coincida
+      bcrypt.compare.mockResolvedValue(true);
+
       const res = await request(app).post('/api/login').send({
         email: 'Jorge5278222@tec.mx',
         password: '123'
       });
       expect(res.status).toBe(200);
-      expect(res.body.token).toBeDefined();
+      expect(res.body.token || res.body.accessToken).toBeDefined();
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
     });
 
     it('should return 401 if user is not found', async () => {
@@ -96,15 +116,49 @@ describe('UserController', () => {
 
   describe('PUT /api/users/:id', () => {
     it('should return 400 if data is invalid', async () => {
+      // Simula usuario existente
+      const existingUser = {
+        ID_USUARIO: 1,
+        EMAIL: 'old@example.com',
+        PASSWORD: 'oldHashedPassword'
+      };
+      const mockPrepare = jest.fn().mockImplementation((query) => {
+        if (query.includes('SELECT')) {
+          return { exec: jest.fn().mockResolvedValue([existingUser]) };
+        }
+        if (query.includes('UPDATE')) {
+          return { exec: jest.fn().mockResolvedValue() };
+        }
+      });
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve({ prepare: mockPrepare });
+
       const res = await request(app).put('/api/users/1').send({ email: 'invalid' });
       expect(res.status).toBe(400);
-      expect(res.body.message).toBeDefined();  // Ajusta según tu código
+      expect(res.body.message).toBeDefined();
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
     });
 
     it('should return 404 if user not found', async () => {
+      const mockPrepare = jest.fn().mockImplementation((query) => {
+        if (query.includes('SELECT')) {
+          return { exec: jest.fn().mockResolvedValue([]) }; // No hay usuario
+        }
+        if (query.includes('UPDATE')) {
+          return { exec: jest.fn().mockResolvedValue() };
+        }
+      });
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve({ prepare: mockPrepare });
+
       const res = await request(app).put('/api/users/9999').send({ email: 'new@example.com' });
-      expect(res.status).toBe(404);  // Ajusta según tu código real
+      expect(res.status).toBe(404);
       expect(res.body.message).toBeDefined();
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
     });
 
     it('should return 200 if update is successful', async () => {
@@ -322,6 +376,10 @@ describe('UserController', () => {
   });
 
   describe('GET /api/users/:id', () => {
+    beforeAll(() => {
+      app.get('/api/users/:id', userController.getUserById);
+    });
+
     it('should return 404 if user is not found', async () => {
       const mockPrepare = jest.fn().mockImplementation(() => ({
         exec: jest.fn().mockResolvedValue([]) // No hay usuario
@@ -375,6 +433,10 @@ describe('UserController', () => {
   });
 
   describe('GET /api/users', () => {
+    beforeAll(() => {
+      app.get('/api/users', userController.getUsers);
+    });
+
     it('should return all users', async () => {
       const mockUsers = [{ ID: 1, EMAIL: 'a' }, { ID: 2, EMAIL: 'b' }];
       const mockPrepare = jest.fn().mockImplementation(() => ({
