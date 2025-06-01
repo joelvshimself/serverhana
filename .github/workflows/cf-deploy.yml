@@ -2,7 +2,9 @@ name: Deploy to SAP Cloud Foundry
 
 on:
   push:
-    branches: [main]
+    branches: 
+      - main
+      - stage
 
 jobs:
   deploy:

@@ -585,12 +585,7 @@ crudr.delete("/ventas/:id", auth("detallista","developer"), async (req, res) => 
       DELETE FROM DetalleVenta WHERE id_venta = ${ventaId}
     `);
 
-    // Luego eliminar venta
-    const result = await connection.exec(`
-      DELETE FROM Venta WHERE id_venta = ${ventaId}
-    `);
-
-    print(result);
+    
 
     res.status(200).json({ message: `Venta ${ventaId} eliminada exitosamente` });
 
@@ -708,7 +703,7 @@ crudr.put("/ventas/:id", auth("detallista","developer"), async (req, res) => {
  *       200:
  *         description: Lista de órdenes
  */
-crudr.get("/ordenes", auth("detallista", "proveedor"), async (req, res) => {
+crudr.get("/ordenes", auth("detallista", "proveedor", "developer"), async (req, res) => {
   try {
     const connection = await poolPromise;
 
