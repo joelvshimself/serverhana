@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { poolPromise } from "../config/dbConfig.js";
 
+import { auth } from "../middleware/auth.js"
+
 const router = Router();
 
 /**
@@ -35,7 +37,7 @@ const router = Router();
  *       500:
  *         description: Error interno del servidor.
  */
-router.get("/", async (req, res) => {
+router.get("/", auth("owner","detallista","developer"), async (req, res) => {
   try {
     const connection = await poolPromise;
     const result = await connection.exec(`
@@ -77,7 +79,7 @@ router.get("/", async (req, res) => {
  *       500:
  *         description: Error interno del servidor.
  */
-router.get("/vendido", async (req, res) => {
+router.get("/vendido", auth("owner","detallista", "developer"), async (req, res) => {
   try {
     const connection = await poolPromise;
     const result = await connection.exec(`
