@@ -38,14 +38,12 @@ export const loginUser = async (req, res) => {
       httpOnly: true,
       sameSite: "Lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: 15 * 60 * 1000 // 15 minutos
+      maxAge: 15 * 60 * 1000 // 15 minutes
     });
 
-    // Respondemos también con el token en el body, para que el test lo encuentre
     res.json({
       message: "Credenciales válidas, esperando verificación 2FA",
-      twoFAEnabled: has2FA,
-      accessToken: tempToken
+      twoFAEnabled: has2FA
     });
 
   } catch (error) {
@@ -207,7 +205,6 @@ export const updateUser = async (req, res) => {
     }
 
     const existingUser = result[0];
-    const has2FA = !!existingUser.TWOFASECRET;
 
     // Hashear la contraseña solo si viene una nueva
     let hashedPassword = existingUser.PASSWORD;
@@ -225,14 +222,11 @@ export const updateUser = async (req, res) => {
         rol = ? 
       WHERE "ID_USUARIO" = ?
     `);
+    
 
     await updateStmt.exec([nombre, email, hashedPassword, rol, id]);
 
-    // Ahora devolvemos también twoFAEnabled para que el test lo vea
-    res.json({
-      message: "Usuario actualizado correctamente",
-      twoFAEnabled: has2FA
-    });
+    res.json({ message: "Usuario actualizado correctamente" });
 
   } catch (error) {
     console.error("Error al actualizar usuario:", error);
