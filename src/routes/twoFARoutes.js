@@ -115,6 +115,6 @@ router.post("/2fa/status", preAuth, check2FAStatus);
  *         description: Error en el servidor
  */
 
-router.post("/2fa/reset", auth("admin"), reset2FA);
+router.post("/2fa/reset", auth("admin","developer"), reset2FA);
 
 export default router;
