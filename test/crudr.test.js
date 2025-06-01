@@ -277,6 +277,98 @@ describe('CRUDR Notificaciones', () => {
   });
 });
 
+describe('CRUDR Ordenes', () => {
+  it('should return all ordenes', async () => {
+    const mockOrdenes = [
+      { ID_ORDEN: 1, ESTADO: 'nueva', FECHA_EMISION: '2025-05-23' },
+      { ID_ORDEN: 2, ESTADO: 'completada', FECHA_EMISION: '2025-05-24' }
+    ];
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockResolvedValue(mockOrdenes) }));
+
+    const res = await request(app).get('/crud/ordenes');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body[0]).toHaveProperty('ID_ORDEN');
+  });
+
+  it('should return 500 on ordenes db error', async () => {
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockRejectedValue(new Error('fail')) }));
+
+    const res = await request(app).get('/crud/ordenes');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/ordenes/i);
+  });
+
+  it('should delete orden and suborden', async () => {
+    const mockExec = jest.fn().mockResolvedValue({});
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).delete('/crud/ordenes/1');
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/eliminadas/i);
+  });
+
+  it('should return 500 on delete orden error', async () => {
+    const mockExec = jest.fn().mockRejectedValue(new Error('fail'));
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).delete('/crud/ordenes/1');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/eliminar orden/i);
+  });
+
+  it('should update orden', async () => {
+    const mockExec = jest.fn().mockResolvedValue({});
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).put('/crud/ordenes/1').send({
+      estado: 'completada',
+      fecha_emision: '2025-05-23',
+      fecha_recepcion: '2025-05-24',
+      fecha_estimada: '2025-05-25',
+      subtotal: 100,
+      costo: 200,
+      usuario_solicita: 1,
+      usuario_provee: 2
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/actualizada/i);
+  });
+
+  it('should return 500 on update orden error', async () => {
+    const mockExec = jest.fn().mockRejectedValue(new Error('fail'));
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).put('/crud/ordenes/1').send({
+      estado: 'completada'
+    });
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/actualizar orden/i);
+  });
+});
+
+describe('CRUDR Forecast', () => {
+  it('should return forecast data', async () => {
+    const mockForecast = [
+      { Time: '2025-06-01', Forecast: 100, Prediction_Interval_Max: 120, Prediction_Interval_Min: 80 }
+    ];
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockResolvedValue(mockForecast) }));
+
+    const res = await request(app).get('/crud/forecast');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body[0]).toHaveProperty('Forecast');
+  });
+
+  it('should return 500 on forecast db error', async () => {
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockRejectedValue(new Error('fail')) }));
+
+    const res = await request(app).get('/crud/forecast');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/pronóstico/i);
+  });
+});
+
 afterEach(() => {
   jest.clearAllMocks();
 });
