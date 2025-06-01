@@ -1,17 +1,23 @@
 import request from 'supertest';
 import express from 'express';
-import crudr from '../src/routes/crudr.js';
-import { poolPromise } from '../src/config/dbConfig.js';
 
-const app = express();
-app.use(express.json());
-app.use('/crud', crudr);
+// Mock de auth antes de importar crudr
+jest.mock('../src/middleware/auth.js', () => ({
+  auth: (...roles) => (req, res, next) => next()
+}));
 
 jest.mock('../src/config/dbConfig.js', () => ({
   poolPromise: Promise.resolve({
     exec: jest.fn()
   })
 }));
+
+import crudr from '../src/routes/crudr.js';
+import { poolPromise } from '../src/config/dbConfig.js';
+
+const app = express();
+app.use(express.json());
+app.use('/crud', crudr);
 
 describe('CRUD Routes Tests', () => {
   it('should access CRUD endpoint', async () => {
