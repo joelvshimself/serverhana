@@ -30,11 +30,30 @@ describe('UserController', () => {
     });
 
     it('should return 401 for invalid credentials', async () => {
+      // Mock de la base de datos para que encuentre usuario pero bcrypt falle
+      const user = {
+        ID: 1,
+        EMAIL: 'test@example.com',
+        PASSWORD: 'hashedPassword',
+        TWOFASECRET: null
+      };
+      const mockPrepare = jest.fn().mockImplementation(() => ({
+        exec: jest.fn().mockResolvedValue([user])
+      }));
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve({ prepare: mockPrepare });
+
+      // Mock bcrypt para que la contraseña NO coincida
+      bcrypt.compare.mockResolvedValue(false);
+
       const res = await request(app).post('/api/login').send({
         email: 'test@example.com',
         password: 'wrongpass'
       });
-      expect(res.status).toBe(401);  // Ajusta según tu lógica real
+      expect(res.status).toBe(401);
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
     });
 
     it('should return 200 and token for valid login', async () => {
@@ -162,9 +181,31 @@ describe('UserController', () => {
     });
 
     it('should return 200 if update is successful', async () => {
+      // Mock de usuario existente
+      const existingUser = {
+        ID_USUARIO: 1,
+        EMAIL: 'old@example.com',
+        PASSWORD: 'oldHashedPassword',
+        TWOFASECRET: null
+      };
+      const mockPrepare = jest.fn().mockImplementation((query) => {
+        if (query.includes('SELECT')) {
+          return { exec: jest.fn().mockResolvedValue([existingUser]) };
+        }
+        if (query.includes('UPDATE')) {
+          return { exec: jest.fn().mockResolvedValue() };
+        }
+      });
+      const originalPoolPromise = require('../src/config/dbConfig.js').poolPromise;
+      require('../src/config/dbConfig.js').poolPromise = Promise.resolve({ prepare: mockPrepare });
+
       const res = await request(app).put('/api/users/1').send({ email: 'new@example.com' });
       expect(res.status).toBe(200);
-      expect(res.body.message).toBeDefined();  // Ajusta según tu código
+      expect(res.body.message).toMatch(/actualizado correctamente/i);
+      expect(typeof res.body.twoFAEnabled).toBe('boolean');
+
+      require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
+      jest.clearAllMocks();
     });
 
     it('should hash password if a new password is provided', async () => {
@@ -229,6 +270,7 @@ describe('UserController', () => {
       expect(res.status).toBe(200);
       expect(res.body.twoFAEnabled).toBe(true);
       expect(res.body.message).toMatch(/2FA/i);
+      expect(typeof res.body.twoFAEnabled).toBe('boolean');
 
       require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
       jest.clearAllMocks();
@@ -256,6 +298,7 @@ describe('UserController', () => {
       expect(res.status).toBe(200);
       expect(res.body.twoFAEnabled).toBe(false);
       expect(res.body.message).toMatch(/2FA/i);
+      expect(typeof res.body.twoFAEnabled).toBe('boolean');
 
       require('../src/config/dbConfig.js').poolPromise = originalPoolPromise;
       jest.clearAllMocks();
