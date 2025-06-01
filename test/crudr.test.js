@@ -216,6 +216,61 @@ describe('CRUDR Ventas', () => {
   });
 });
 
+describe('CRUDR Notificaciones', () => {
+  it('should return 400 if mensaje or tipo is missing on create', async () => {
+    const res = await request(app).post('/crud/notificaciones').send({ tipo: 'orden' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/mensaje y tipo/i);
+  });
+
+  it('should create notificacion and return 201', async () => {
+    const mockExec = jest.fn().mockResolvedValue({});
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/notificaciones').send({
+      mensaje: 'Tienes una nueva orden asignada',
+      tipo: 'orden',
+      id_usuario: 1
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.message).toMatch(/notificación creada/i);
+  });
+
+  it('should return 500 if db error on create', async () => {
+    const mockExec = jest.fn().mockRejectedValue(new Error('fail'));
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/notificaciones').send({
+      mensaje: 'Tienes una nueva orden asignada',
+      tipo: 'orden'
+    });
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/crear notificación/i);
+  });
+
+  it('should return all notificaciones', async () => {
+    const mockNotificaciones = [
+      { id_notificacion: 1, mensaje: 'Hola', tipo: 'orden', id_usuario: 1 },
+      { id_notificacion: 2, mensaje: 'Adiós', tipo: 'alerta', id_usuario: 2 }
+    ];
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockResolvedValue(mockNotificaciones) }));
+
+    const res = await request(app).get('/crud/notificaciones');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBe(2);
+    expect(res.body[0]).toHaveProperty('mensaje');
+  });
+
+  it('should return 500 if db error on get', async () => {
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockRejectedValue(new Error('fail')) }));
+
+    const res = await request(app).get('/crud/notificaciones');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/obtener notificaciones/i);
+  });
+});
+
 afterEach(() => {
   jest.clearAllMocks();
 });
