@@ -37,7 +37,7 @@ const router = Router();
  *       500:
  *         description: Error interno del servidor.
  */
-router.get("/", auth("owner","detallista"), async (req, res) => {
+router.get("/", auth("owner","detallista","developer"), async (req, res) => {
   try {
     const connection = await poolPromise;
     const result = await connection.exec(`
@@ -79,7 +79,7 @@ router.get("/", auth("owner","detallista"), async (req, res) => {
  *       500:
  *         description: Error interno del servidor.
  */
-router.get("/vendido", auth("owner","detallista"), async (req, res) => {
+router.get("/vendido", auth("owner","detallista", "developer"), async (req, res) => {
   try {
     const connection = await poolPromise;
     const result = await connection.exec(`
