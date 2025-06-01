@@ -189,11 +189,6 @@ export const updateUser = async (req, res) => {
     const { id } = req.params;
     const { nombre, email, password, rol } = req.body;
 
-    // Validación de email
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return res.status(400).json({ message: "Email inválido" });
-    }
-
     const conn = await poolPromise;
 
     // Verificar si el usuario existe
