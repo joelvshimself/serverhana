@@ -703,7 +703,7 @@ crudr.put("/ventas/:id", auth("detallista","developer"), async (req, res) => {
  *       200:
  *         description: Lista de órdenes
  */
-crudr.get("/ordenes", auth("detallista", "proveedor", "developer"), async (req, res) => {
+crudr.get("/ordenes", auth("detallista", "proveedor", "developer", "owner"), async (req, res) => {
   try {
     const connection = await poolPromise;
 
