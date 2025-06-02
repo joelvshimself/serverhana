@@ -225,7 +225,7 @@ crudr.post('/nuevaorden', auth("detallista","developer"), async (req, res) => {
  *         description: Error interno al completar la orden
  */
 
-crudr.post('/completarorden/:id', auth("detallista", "developer"), async (req, res) => {
+crudr.post('/completarorden/:id', auth("detallista", "developer", "proveedor"), async (req, res) => {
   const { fecha_recepcion } = req.body;
   const ordenId = req.params.id;
   let connection;
