@@ -47,7 +47,7 @@ const router = express.Router();
  *                     example: admin
  */
 
-router.get("/usuarios", auth("admin","developer"), getUsers);
+router.get("/usuarios", auth("admin","developer","detallista","proveedor","owner"), getUsers);
 
 /**
  * @swagger
@@ -69,7 +69,7 @@ router.get("/usuarios", auth("admin","developer"), getUsers);
  *       404:
  *         description: Usuario no encontrado.
  */
-router.get("/usuarios/:id", auth("admin"), getUserById);
+router.get("/usuarios/:id", auth("admin","proveedor","detallista","developer", "owner"), getUserById);
 
 /**
  * @swagger
