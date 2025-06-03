@@ -5,12 +5,7 @@ import jwt from 'jsonwebtoken';
 
 export const generate2FA = async (req, res) => {
   try {
-    const preAuthToken = req.cookies?.PreAuth;
-    if (!preAuthToken)
-      return res.status(401).json({ message: "Falta token PreAuth" });
-
-    const decoded = jwt.verify(preAuthToken, process.env.JWT_SECRET);
-    const { email } = decoded;
+    const { email } = req.preAuth;
 
     if (!email)
       return res.status(400).json({ message: "Token inválido: falta email" });
@@ -36,12 +31,8 @@ export const generate2FA = async (req, res) => {
 
 export const verify2FA = async (req, res) => {
   try {
-    const preAuthToken = req.cookies?.PreAuth;
+    const decoded = req.preAuth;
 
-    if (!preAuthToken)
-      return res.status(401).json({ message: "Falta token PreAuth" });
-
-    const decoded = jwt.verify(preAuthToken, process.env.JWT_SECRET);
     if (decoded.step !== "pre-2fa")
       return res.status(401).json({ message: "Token inválido para 2FA" });
 
@@ -68,7 +59,7 @@ export const verify2FA = async (req, res) => {
       return res.status(401).json({ message: "Código 2FA inválido" });
 
     const finalToken = jwt.sign(
-      { userId: user.ID, email: user.EMAIL, rol: user.ROL },
+      { userId: user.ID_USUARIO, email: user.EMAIL, rol: user.ROL },
       process.env.JWT_SECRET,
       { expiresIn: "4h" }
     );
@@ -82,7 +73,7 @@ export const verify2FA = async (req, res) => {
     });
 
     res.cookie("UserData", JSON.stringify({
-      userId: user.ID,
+      userId: user.ID_USUARIO,
       email: user.EMAIL,
       role: user.ROL,
       nombre: user.NOMBRE
@@ -102,13 +93,8 @@ export const verify2FA = async (req, res) => {
 }; 
 
   export const check2FAStatus = async (req, res) => {
-    const preAuthToken = req.cookies?.PreAuth;
-    if (!preAuthToken)
-      return res.status(401).json({ message: "Falta token PreAuth" });
+    const decoded = req.preAuth;
 
-    const decoded = jwt.verify(preAuthToken, process.env.JWT_SECRET);
-    //console.log(decoded)
-    
     const result = decoded.twoFAEnabled
   
     if (!result || result.length === 0) {

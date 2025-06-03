@@ -1,6 +1,7 @@
 import express from "express";
 import { generate2FA, verify2FA, check2FAStatus, reset2FA } from "../controllers/twoFAController.js";
 import { auth } from "../middleware/auth.js"
+import { preAuth } from '../middleware/preAuth.js';
 
 const router = express.Router();
 /**
@@ -42,7 +43,7 @@ const router = express.Router();
  *                 otpauth_url:
  *                   type: string
  */
-router.post("/2fa/generate", generate2FA);
+router.post("/2fa/generate", preAuth, generate2FA);
 
 /**
  * @swagger
@@ -67,7 +68,7 @@ router.post("/2fa/generate", generate2FA);
  *       401:
  *         description: Código incorrecto
  */
-router.post("/2fa/verify", verify2FA);
+router.post("/2fa/verify", preAuth, verify2FA);
 
 /**
  * @swagger
@@ -88,7 +89,7 @@ router.post("/2fa/verify", verify2FA);
  *                 twoFAEnabled:
  *                   type: boolean
  */
-router.post("/2fa/status", check2FAStatus);
+router.post("/2fa/status", preAuth, check2FAStatus);
 
 /**
  * @swagger
@@ -114,6 +115,6 @@ router.post("/2fa/status", check2FAStatus);
  *         description: Error en el servidor
  */
 
-router.post("/2fa/reset", auth("admin"), reset2FA);
+router.post("/2fa/reset", auth("admin","developer"), reset2FA);
 
 export default router;

@@ -1,15 +1,396 @@
-
 import request from 'supertest';
 import express from 'express';
+
+// Mock de auth antes de importar crudr
+jest.mock('../src/middleware/auth.js', () => ({
+  auth: (...roles) => (req, res, next) => next()
+}));
+
+jest.mock('../src/config/dbConfig.js', () => ({
+  poolPromise: Promise.resolve({
+    exec: jest.fn()
+  })
+}));
+
 import crudr from '../src/routes/crudr.js';
+import { poolPromise } from '../src/config/dbConfig.js';
 
 const app = express();
 app.use(express.json());
 app.use('/crud', crudr);
 
 describe('CRUD Routes Tests', () => {
-    it('should access CRUD endpoint', async () => {
-        const res = await request(app).get('/crud');
-        expect([200, 404, 500]).toContain(res.status);
+  it('should access CRUD endpoint', async () => {
+    const res = await request(app).get('/crud');
+    expect([200, 404, 500]).toContain(res.status);
+  });
+});
+
+describe('CRUDR Nueva Orden', () => {
+  it('should return 400 if missing fields', async () => {
+    const res = await request(app).post('/crud/nuevaorden').send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/faltan campos/i);
+  });
+
+  it('should return 404 if solicitante not found', async () => {
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce([]); // No solicitante
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/nuevaorden').send({
+      correo_solicita: 'a@a.com',
+      correo_provee: 'b@b.com',
+      productos: [],
+      fecha_emision: '2025-05-23'
     });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/solicitante/i);
+  });
+
+  it('should return 404 if proveedor not found', async () => {
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce([{ ID_SOLICITA: 1 }]) // solicitante ok
+      .mockResolvedValueOnce([]); // proveedor no
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/nuevaorden').send({
+      correo_solicita: 'a@a.com',
+      correo_provee: 'b@b.com',
+      productos: [],
+      fecha_emision: '2025-05-23'
+    });
+    expect(res.status).toBe(404);
+    expect(res.body.error).toMatch(/proveedor/i);
+  });
+
+  it('should return 400 if product missing fields', async () => {
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce([{ ID_SOLICITA: 1 }])
+      .mockResolvedValueOnce([{ ID_PROVEE: 2 }])
+      .mockResolvedValueOnce([ { ID_ORDEN_OUTPUT: 10 } ]);
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/nuevaorden').send({
+      correo_solicita: 'a@a.com',
+      correo_provee: 'b@b.com',
+      productos: [{ producto: 'arrachera', cantidad: 1 }], // falta precio
+      fecha_emision: '2025-05-23'
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/producto.*nombre, cantidad y precio/i);
+  });
+
+  it('should create order and return 201', async () => {
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce([{ ID_SOLICITA: 1 }])
+      .mockResolvedValueOnce([{ ID_PROVEE: 2 }])
+      .mockResolvedValueOnce([{ ID_ORDEN_OUTPUT: 10 }])
+      .mockResolvedValue({}); // para productos y notificación
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/nuevaorden').send({
+      correo_solicita: 'a@a.com',
+      correo_provee: 'b@b.com',
+      productos: [{ producto: 'arrachera', cantidad: 1, precio: 100 }],
+      fecha_emision: '2025-05-23'
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.message).toMatch(/creada/i);
+    expect(res.body.id_orden).toBe(10);
+  });
+});
+
+describe('CRUDR Vender', () => {
+  it('should return 400 if productos is not array', async () => {
+    const res = await request(app).post('/crud/vender').send({ productos: 'noarray' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/array de productos/i);
+  });
+
+  it('should return 400 if producto missing fields', async () => {
+    const res = await request(app).post('/crud/vender').send({ productos: [{ producto: 'arrachera' }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/nombre y cantidad/i);
+  });
+
+  it('should return 400 if producto not recognized', async () => {
+    const res = await request(app).post('/crud/vender').send({ productos: [{ producto: 'pollo', cantidad: 1 }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/no reconocido/i);
+  });
+
+  it('should return 400 if not enough inventory', async () => {
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce([{ RESULTADO: 0 }]); // inventario insuficiente
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/vender').send({
+      productos: [{ producto: 'arrachera', cantidad: 1 }],
+      fecha_emision: '2025-05-23'
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/suficiente inventario/i);
+  });
+
+  it('should return 201 and venta info on success', async () => {
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce([{ RESULTADO: 1 }]) // inventario ok
+      .mockResolvedValueOnce({}) // insert venta
+      .mockResolvedValueOnce([{ ID_VENTA: 5 }]) // id venta
+      .mockResolvedValueOnce([{ ID_INVENTARIO: 1 }]) // inventario disponible
+      .mockResolvedValue({}); // resto de inserts/updates
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/vender').send({
+      productos: [{ producto: 'arrachera', cantidad: 1 }],
+      fecha_emision: '2025-05-23'
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.message).toMatch(/venta realizada/i);
+    expect(res.body.id_venta).toBe(5);
+    expect(res.body.total).toBeGreaterThan(0);
+  });
+});
+
+describe('CRUDR Ventas', () => {
+  it('should return ventas agrupadas', async () => {
+    const mockVentas = [
+      { ID_VENTA: 1, TOTAL: 100, FECHA: '2025-05-23', ID_INVENTARIO: 1, COSTO_UNITARIO: 100, PRODUCTO: 'arrachera' },
+      { ID_VENTA: 1, TOTAL: 100, FECHA: '2025-05-23', ID_INVENTARIO: 2, COSTO_UNITARIO: 100, PRODUCTO: 'ribeye' },
+      { ID_VENTA: 2, TOTAL: 200, FECHA: '2025-05-24', ID_INVENTARIO: 3, COSTO_UNITARIO: 200, PRODUCTO: 'tomahawk' }
+    ];
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockResolvedValue(mockVentas) }));
+
+    const res = await request(app).get('/crud/ventas');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body[0]).toHaveProperty('productos');
+  });
+
+  it('should return 500 on ventas error', async () => {
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockRejectedValue(new Error('fail')) }));
+
+    const res = await request(app).get('/crud/ventas');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/obtener ventas/i); // <-- igual que el backend
+  });
+
+  it('should delete venta', async () => {
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce({}) // DetalleVenta delete
+      .mockResolvedValueOnce({}); // Venta delete
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).delete('/crud/ventas/1');
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/eliminada/i);
+  });
+
+  it('should return 500 if db error on delete venta', async () => {
+    const mockExec = jest.fn().mockRejectedValue(new Error('fail'));
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).delete('/crud/ventas/1');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/eliminar venta/i);
+  });
+
+  it('should return 404 if venta not found (DetalleVenta no existe)', async () => {
+    // Simula que no existe la venta (puedes ajustar según tu lógica real)
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce({}) // DetalleVenta delete
+      .mockResolvedValueOnce(null); // Venta delete devuelve null o undefined
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).delete('/crud/ventas/9999');
+    // Según tu backend, podrías devolver 200 aunque no exista, o 404 si lo manejas así
+    // Aquí se asume 200 por el código actual, pero puedes ajustar:
+    expect([200, 404]).toContain(res.status);
+  });
+
+  it('should update venta', async () => {
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce({}) // DetalleVenta delete
+      .mockResolvedValueOnce([{ ID_INVENTARIO: 1 }, { ID_INVENTARIO: 2 }]) // inventario
+      .mockResolvedValueOnce({}) // DetalleVenta insert
+      .mockResolvedValueOnce({}) // update venta
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).put('/crud/ventas/1').send({
+      productos: [{ nombre: 'arrachera', cantidad: 2, costo_unitario: 100 }]
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/actualizada/i);
+  });
+
+  it('should return 400 if productos missing or empty on update', async () => {
+    const res = await request(app).put('/crud/ventas/1').send({ productos: [] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/lista de productos/i);
+  });
+
+  it('should return 400 if not enough units on update', async () => {
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce({}) // DetalleVenta delete
+      .mockResolvedValueOnce([]); // inventario insuficiente
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).put('/crud/ventas/1').send({
+      productos: [{ nombre: 'arrachera', cantidad: 2, costo_unitario: 100 }]
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/no hay suficientes/i);
+  });
+});
+
+describe('CRUDR Notificaciones', () => {
+  it('should return 400 if mensaje or tipo is missing on create', async () => {
+    const res = await request(app).post('/crud/notificaciones').send({ tipo: 'orden' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/mensaje y tipo/i);
+  });
+
+  it('should create notificacion and return 201', async () => {
+    const mockExec = jest.fn().mockResolvedValue({});
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/notificaciones').send({
+      mensaje: 'Tienes una nueva orden asignada',
+      tipo: 'orden',
+      id_usuario: 1
+    });
+    expect(res.status).toBe(201);
+    expect(res.body.message).toMatch(/notificación creada/i);
+  });
+
+  it('should return 500 if db error on create', async () => {
+    const mockExec = jest.fn().mockRejectedValue(new Error('fail'));
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).post('/crud/notificaciones').send({
+      mensaje: 'Tienes una nueva orden asignada',
+      tipo: 'orden'
+    });
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/crear notificación/i); // <-- igual que el backend
+  });
+
+  it('should return all notificaciones', async () => {
+    const mockNotificaciones = [
+      { id_notificacion: 1, mensaje: 'Hola', tipo: 'orden', id_usuario: 1 },
+      { id_notificacion: 2, mensaje: 'Adiós', tipo: 'alerta', id_usuario: 2 }
+    ];
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockResolvedValue(mockNotificaciones) }));
+
+    const res = await request(app).get('/crud/notificaciones');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBe(2);
+    expect(res.body[0]).toHaveProperty('mensaje');
+  });
+
+  it('should return 500 if db error on get', async () => {
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockRejectedValue(new Error('fail')) }));
+
+    const res = await request(app).get('/crud/notificaciones');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/obtener notificaciones/i); // <-- igual que el backend
+  });
+});
+
+describe('CRUDR Ordenes', () => {
+  it('should return all ordenes', async () => {
+    const mockOrdenes = [
+      { ID_ORDEN: 1, ESTADO: 'nueva', FECHA_EMISION: '2025-05-23' },
+      { ID_ORDEN: 2, ESTADO: 'completada', FECHA_EMISION: '2025-05-24' }
+    ];
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockResolvedValue(mockOrdenes) }));
+
+    const res = await request(app).get('/crud/ordenes');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body[0]).toHaveProperty('ID_ORDEN');
+  });
+
+  it('should return 500 on ordenes db error', async () => {
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockRejectedValue(new Error('fail')) }));
+
+    const res = await request(app).get('/crud/ordenes');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/obtener órdenes/i); // <-- con tilde
+  });
+
+  it('should delete orden and suborden', async () => {
+    const mockExec = jest.fn().mockResolvedValue({});
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).delete('/crud/ordenes/1');
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/eliminadas/i);
+  });
+
+  it('should return 500 on delete orden error', async () => {
+    const mockExec = jest.fn().mockRejectedValue(new Error('fail'));
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).delete('/crud/ordenes/1');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/eliminar orden/i); // <-- igual que el backend
+  });
+
+  it('should update orden', async () => {
+    const mockExec = jest.fn().mockResolvedValue({});
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).put('/crud/ordenes/1').send({
+      estado: 'completada',
+      fecha_emision: '2025-05-23',
+      fecha_recepcion: '2025-05-24',
+      fecha_estimada: '2025-05-25',
+      subtotal: 100,
+      costo: 200,
+      usuario_solicita: 1,
+      usuario_provee: 2
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/actualizada/i);
+  });
+
+  it('should return 500 on update orden error', async () => {
+    const mockExec = jest.fn().mockRejectedValue(new Error('fail'));
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).put('/crud/ordenes/1').send({
+      estado: 'completada'
+    });
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/actualizar orden/i); // <-- igual que el backend
+  });
+});
+
+describe('CRUDR Forecast', () => {
+  it('should return forecast data', async () => {
+    const mockForecast = [
+      { Time: '2025-06-01', Forecast: 100, Prediction_Interval_Max: 120, Prediction_Interval_Min: 80 }
+    ];
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockResolvedValue(mockForecast) }));
+
+    const res = await request(app).get('/crud/forecast');
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body[0]).toHaveProperty('Forecast');
+  });
+
+  it('should return 500 on forecast db error', async () => {
+    poolPromise.then = jest.fn(cb => cb({ exec: jest.fn().mockRejectedValue(new Error('fail')) }));
+
+    const res = await request(app).get('/crud/forecast');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/obtener datos de pronóstico/i); // <-- igual que el backend
+  });
+});
+
+afterEach(() => {
+  jest.clearAllMocks();
 });
