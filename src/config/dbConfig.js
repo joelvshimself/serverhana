@@ -15,8 +15,9 @@ const poolPromise = new Promise((resolve, reject) => {
   const conn = hana.createConnection();
   conn.connect(dbConfig, (err) => {
     if (err) {
-      console.error("Error de conexión a SAP HANA:", err);
-      reject(err);
+      const error = err instanceof Error ? err : new Error(err.message || String(err));
+      console.error("Error de conexión a SAP HANA:", error);
+      reject(error);
     } else {
       console.log("Conectado a SAP HANA Cloud");
       resolve(conn);
