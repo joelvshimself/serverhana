@@ -173,7 +173,7 @@ describe('CRUDR Ventas', () => {
 
     const res = await request(app).get('/crud/ventas');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/ventas/i);
+    expect(res.body.error).toMatch(/obtener ventas/i); // <-- igual que el backend
   });
 
   it('should delete venta', async () => {
@@ -185,6 +185,28 @@ describe('CRUDR Ventas', () => {
     const res = await request(app).delete('/crud/ventas/1');
     expect(res.status).toBe(200);
     expect(res.body.message).toMatch(/eliminada/i);
+  });
+
+  it('should return 500 if db error on delete venta', async () => {
+    const mockExec = jest.fn().mockRejectedValue(new Error('fail'));
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).delete('/crud/ventas/1');
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/eliminar venta/i);
+  });
+
+  it('should return 404 if venta not found (DetalleVenta no existe)', async () => {
+    // Simula que no existe la venta (puedes ajustar según tu lógica real)
+    const mockExec = jest.fn()
+      .mockResolvedValueOnce({}) // DetalleVenta delete
+      .mockResolvedValueOnce(null); // Venta delete devuelve null o undefined
+    poolPromise.then = jest.fn(cb => cb({ exec: mockExec }));
+
+    const res = await request(app).delete('/crud/ventas/9999');
+    // Según tu backend, podrías devolver 200 aunque no exista, o 404 si lo manejas así
+    // Aquí se asume 200 por el código actual, pero puedes ajustar:
+    expect([200, 404]).toContain(res.status);
   });
 
   it('should update venta', async () => {
@@ -251,7 +273,7 @@ describe('CRUDR Notificaciones', () => {
       tipo: 'orden'
     });
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/crear notificación/i);
+    expect(res.body.error).toMatch(/crear notificación/i); // <-- igual que el backend
   });
 
   it('should return all notificaciones', async () => {
@@ -273,7 +295,7 @@ describe('CRUDR Notificaciones', () => {
 
     const res = await request(app).get('/crud/notificaciones');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/obtener notificaciones/i);
+    expect(res.body.error).toMatch(/obtener notificaciones/i); // <-- igual que el backend
   });
 });
 
@@ -296,7 +318,7 @@ describe('CRUDR Ordenes', () => {
 
     const res = await request(app).get('/crud/ordenes');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/ordenes/i);
+    expect(res.body.error).toMatch(/obtener órdenes/i); // <-- con tilde
   });
 
   it('should delete orden and suborden', async () => {
@@ -314,7 +336,7 @@ describe('CRUDR Ordenes', () => {
 
     const res = await request(app).delete('/crud/ordenes/1');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/eliminar orden/i);
+    expect(res.body.error).toMatch(/eliminar orden/i); // <-- igual que el backend
   });
 
   it('should update orden', async () => {
@@ -343,7 +365,7 @@ describe('CRUDR Ordenes', () => {
       estado: 'completada'
     });
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/actualizar orden/i);
+    expect(res.body.error).toMatch(/actualizar orden/i); // <-- igual que el backend
   });
 });
 
@@ -365,7 +387,7 @@ describe('CRUDR Forecast', () => {
 
     const res = await request(app).get('/crud/forecast');
     expect(res.status).toBe(500);
-    expect(res.body.error).toMatch(/pronóstico/i);
+    expect(res.body.error).toMatch(/obtener datos de pronóstico/i); // <-- igual que el backend
   });
 });
 

@@ -4,6 +4,71 @@ import { poolPromise } from '../config/dbConfig.js';
 import { auth } from "../middleware/auth.js"
 
 const crudr = express.Router();
+const precios = {
+  arrachera: 320,
+  ribeye: 450,
+  tomahawk: 600,
+  diezmillo: 280
+};
+
+function contarProductos(productos) {
+  const cantidades = { arrachera: 0, ribeye: 0, tomahawk: 0, diezmillo: 0 };
+
+  for (const { producto, cantidad } of productos) {
+    if (!producto || typeof cantidad !== 'number') {
+      throw new Error('Cada producto debe tener nombre y cantidad numérica.');
+    }
+
+    const key = producto.toLowerCase();
+    if (!(key in cantidades)) {
+      throw new Error(`Producto no reconocido: ${producto}`);
+    }
+
+    cantidades[key] += cantidad;
+  }
+
+  return cantidades;
+}
+
+async function procesarProducto(item, connection, idVenta) {
+  const { producto, cantidad } = item;
+  const key = producto.toLowerCase();
+
+  const inventario = await connection.exec(`
+    SELECT id_inventario FROM Inventario
+    WHERE producto = '${producto}' AND estado = 'disponible'
+    ORDER BY fecha
+    LIMIT ${cantidad}
+  `);
+
+  if (inventario.length < cantidad) {
+    throw new Error(`Inventario insuficiente para ${producto}`);
+  }
+
+  let subtotal = 0;
+
+  for (const inv of inventario) {
+    const id = inv.ID_INVENTARIO;
+    const precio = precios[key];
+
+    await connection.exec(`
+      INSERT INTO DetalleVenta (id_venta, id_inventario, costo_unitario)
+      VALUES (${idVenta}, ${id}, ${precio})
+    `);
+
+    await connection.exec(`
+      UPDATE Inventario
+      SET estado = 'vendido',
+          tipo_movimiento = 'salida por venta',
+          observaciones = 'Vendido en venta #${idVenta}'
+      WHERE id_inventario = ${id}
+    `);
+
+    subtotal += precio;
+  }
+
+  return subtotal;
+}
 
 /**
  * @swagger
@@ -367,72 +432,34 @@ crudr.post('/completarorden/:id', auth("detallista", "developer", "proveedor"), 
  *         description: Error interno al procesar la venta
  */
 
-crudr.post('/vender', auth("detallista","developer"), async (req, res) => {
+crudr.post('/vender', auth("detallista", "developer"), async (req, res) => {
   const { fecha_emision, productos } = req.body;
-  let connection;
 
   if (!Array.isArray(productos)) {
     return res.status(400).json({ error: 'Se requiere un array de productos y cantidades.' });
   }
 
-  // Inicializar cantidades
-  let cant_arrachera = 0;
-  let cant_ribeye = 0;
-  let cant_tomahawk = 0;
-  let cant_diezmillo = 0;
-
-  // Contar cantidades por producto
-  for (const item of productos) {
-    const { producto, cantidad } = item;
-    if (!producto || typeof cantidad !== 'number') {
-      return res.status(400).json({ error: 'Cada producto debe tener nombre y cantidad numérica.' });
-    }
-
-    switch (producto.toLowerCase()) {
-      case 'arrachera':
-        cant_arrachera += cantidad;
-        break;
-      case 'ribeye':
-        cant_ribeye += cantidad;
-        break;
-      case 'tomahawk':
-        cant_tomahawk += cantidad;
-        break;
-      case 'diezmillo':
-        cant_diezmillo += cantidad;
-        break;
-      default:
-        return res.status(400).json({ error: `Producto no reconocido: ${producto}` });
-    }
-  }
-
   try {
-    connection = await poolPromise;
+    const connection = await poolPromise;
+    const cantidades = contarProductos(productos);
 
-    // 1. Validar si hay suficiente inventario
-    const validarInventario = await connection.exec(`
+    const inventarioOK = await connection.exec(`
       SELECT resultado FROM puedoVenderInventario(
-        ${cant_arrachera}, ${cant_ribeye}, ${cant_tomahawk}, ${cant_diezmillo}
+        ${cantidades.arrachera}, ${cantidades.ribeye},
+        ${cantidades.tomahawk}, ${cantidades.diezmillo}
       )
     `);
 
-    const inventarioDisponible = validarInventario[0]?.RESULTADO;
-
-    if (inventarioDisponible !== 1) {
+    if (inventarioOK[0]?.RESULTADO !== 1) {
       return res.status(400).json({ error: 'No hay suficiente inventario para completar la venta.' });
     }
 
-    // 2. Crear la venta
     await connection.exec(`
       INSERT INTO Venta (fecha, total)
-      VALUES ('${fecha_emision}' , 0)
+      VALUES ('${fecha_emision}', 0)
     `);
 
-    // 3. Obtener ID de la venta recién creada
-    const ventaResult = await connection.exec(`
-      SELECT MAX(id_venta) AS id_venta FROM Venta
-    `);
-
+    const ventaResult = await connection.exec(`SELECT MAX(id_venta) AS id_venta FROM Venta`);
     const idVenta = ventaResult[0]?.ID_VENTA;
 
     if (!idVenta) {
@@ -440,69 +467,25 @@ crudr.post('/vender', auth("detallista","developer"), async (req, res) => {
     }
 
     let totalVenta = 0;
-
-    // 4. Para cada producto vendido
     for (const item of productos) {
-      const { producto, cantidad } = item;
-
-      // Seleccionar N productos disponibles de inventario
-      const inventarioDisponible = await connection.exec(`
-        SELECT id_inventario
-        FROM Inventario
-        WHERE producto = '${producto}' AND estado = 'disponible'
-        ORDER BY fecha
-        LIMIT ${cantidad}
-      `);
-
-      if (inventarioDisponible.length < cantidad) {
-        return res.status(400).json({ error: `Inventario insuficiente para ${producto}` });
-      }
-
-      // 5. Insertar cada producto en DetalleVenta
-      for (const inv of inventarioDisponible) {
-        const idInventario = inv.ID_INVENTARIO;
-
-        // Asumimos precio fijo para este ejemplo
-        let precioUnitario = 0;
-        switch (producto.toLowerCase()) {
-          case 'arrachera': precioUnitario = 320; break;
-          case 'ribeye': precioUnitario = 450; break;
-          case 'tomahawk': precioUnitario = 600; break;
-          case 'diezmillo': precioUnitario = 280; break;
-        }
-
-        await connection.exec(`
-          INSERT INTO DetalleVenta (id_venta, id_inventario, costo_unitario)
-          VALUES (${idVenta}, ${idInventario}, ${precioUnitario})
-        `);
-
-        // Actualizar inventario como vendido
-        await connection.exec(`
-          UPDATE Inventario
-          SET estado = 'vendido',
-              tipo_movimiento = 'salida por venta',
-              observaciones = 'Vendido en venta #${idVenta}'
-          WHERE id_inventario = ${idInventario}
-        `);
-
-        totalVenta += precioUnitario;
-      }
+      totalVenta += await procesarProducto(item, connection, idVenta);
     }
 
-    // 6. Actualizar el total de la venta
     await connection.exec(`
-      UPDATE Venta
-      SET total = ${totalVenta}
+      UPDATE Venta SET total = ${totalVenta}
       WHERE id_venta = ${idVenta}
     `);
 
     res.status(201).json({ message: 'Venta realizada exitosamente.', id_venta: idVenta, total: totalVenta });
 
   } catch (error) {
-    console.error(' Error al vender:', error);
-    res.status(500).json({ error: 'Error al procesar la venta', detail: error.message });
+    console.error('Error al vender:', error);
+    res.status(500).json({ error: error.message || 'Error interno.' });
   }
 });
+
+
+
 
 
 /**
@@ -552,6 +535,8 @@ crudr.get("/ventas", auth("detallista","developer"), async (req, res) => {
     res.status(500).json({ error: "Error al obtener ventas", detail: error.message });
   }
 });
+
+
 /**
  * @swagger
  * /api/ventas/{id}:
