@@ -181,7 +181,13 @@ export const createUser = async (req, res) => {
 };
 
 
+const findUserById = async (id) => {
+  const conn = await poolPromise;
+  const stmt = await conn.prepare('SELECT * FROM Usuario WHERE "ID_USUARIO" = ?');
+  const result = await stmt.exec([id]);
 
+  return result?.[0] || null;
+};
 
 // Actualizar usuario
 export const updateUser = async (req, res) => {
@@ -220,6 +226,20 @@ export const updateUser = async (req, res) => {
     
 
     await updateStmt.exec([nombre, email, hashedPassword, rol, id]);
+    
+    const updatedUser = await findUserById(id) 
+
+    res.cookie("UserData", JSON.stringify({
+      userId: updatedUser.ID_USUARIO,
+      email: updatedUser.EMAIL,
+      role: updatedUser.ROL,
+      nombre: updatedUser.NOMBRE
+    }), {
+      httpOnly: false, // accesible by js
+      sameSite: "Lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 4 * 60 * 60 * 1000 
+    });
 
     res.json({ message: "Usuario actualizado correctamente" });
 

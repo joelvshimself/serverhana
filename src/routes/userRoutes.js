@@ -131,7 +131,7 @@ router.post("/usuarios", auth("admin"), createUser);
  *       200:
  *         description: Usuario actualizado correctamente.
  */
-router.put("/usuarios/:id", auth("admin"), updateUser);
+router.put("/usuarios/:id", auth("admin", "owner", "proveedor", "developer","detallista"), updateUser);
 
 /**
  * @swagger
