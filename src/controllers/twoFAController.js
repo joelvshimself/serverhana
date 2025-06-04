@@ -59,7 +59,7 @@ export const verify2FA = async (req, res) => {
       return res.status(401).json({ message: "Código 2FA inválido" });
 
     const finalToken = jwt.sign(
-      { userId: user.ID_USUARIO, email: user.EMAIL, rol: user.ROL },
+      { userId: user.ID_USUARIO, email: user.EMAIL, rol: user.ROL, nombre: user.NOMBRE },
       process.env.JWT_SECRET,
       { expiresIn: "4h" }
     );

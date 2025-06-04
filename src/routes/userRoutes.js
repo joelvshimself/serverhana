@@ -8,7 +8,8 @@ import {
   loginUser,
   authStatus,
   getUserInfo,
-  logoutUser
+  logoutUser,
+  updateSelf
 } from '../controllers/userController.js';
 
 import { auth } from "../middleware/auth.js"
@@ -47,7 +48,7 @@ const router = express.Router();
  *                     example: admin
  */
 
-router.get("/usuarios", auth("admin","developer","detallista","proveedor","owner"), getUsers);
+router.get("/usuarios", auth("admin","developer"), getUsers);
 
 /**
  * @swagger
@@ -69,7 +70,7 @@ router.get("/usuarios", auth("admin","developer","detallista","proveedor","owner
  *       404:
  *         description: Usuario no encontrado.
  */
-router.get("/usuarios/:id", auth("admin","proveedor","detallista","developer", "owner"), getUserById);
+router.get("/usuarios/:id", auth("admin","developer"), getUserById);
 
 /**
  * @swagger
@@ -96,7 +97,7 @@ router.get("/usuarios/:id", auth("admin","proveedor","detallista","developer", "
  *       201:
  *         description: Usuario creado exitosamente.
  */
-router.post("/usuarios", auth("admin"), createUser);
+router.post("/usuarios", auth("admin","developer"), createUser);
 
 /**
  * @swagger
@@ -131,7 +132,7 @@ router.post("/usuarios", auth("admin"), createUser);
  *       200:
  *         description: Usuario actualizado correctamente.
  */
-router.put("/usuarios/:id", auth("admin", "owner", "proveedor", "developer","detallista"), updateUser);
+router.put("/usuarios/:id", auth("admin","developer"), updateUser);
 
 /**
  * @swagger
@@ -316,5 +317,7 @@ router.post("/logout", logoutUser);
  *                   example: "Invalid token"
  */
 router.get("/user-info", getUserInfo);
+
+router.put("/updateSelf", auth(), updateSelf);
 
 export default router;
