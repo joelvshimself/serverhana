@@ -226,20 +226,6 @@ export const updateUser = async (req, res) => {
     
 
     await updateStmt.exec([nombre, email, hashedPassword, rol, id]);
-    
-    const updatedUser = await findUserById(id) 
-
-    res.cookie("UserData", JSON.stringify({
-      userId: updatedUser.ID_USUARIO,
-      email: updatedUser.EMAIL,
-      role: updatedUser.ROL,
-      nombre: updatedUser.NOMBRE
-    }), {
-      httpOnly: false, // accesible by js
-      sameSite: "Lax",
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 4 * 60 * 60 * 1000 
-    });
 
     res.json({ message: "Usuario actualizado correctamente" });
 
@@ -249,6 +235,73 @@ export const updateUser = async (req, res) => {
   }
 };
 
+export const updateSelf = async (req, res) => {
+  try {
+    const token = req.cookies?.Auth;
+    if (!token) return res.status(401).json({ message: "No autenticado" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.userId;
+    const currentNombre = decoded.nombre;
+    const currentEmail = decoded.email;
+    const currentRole = decoded.rol;
+
+    const { nombre, email, password } = req.body;
+    const conn = await poolPromise;
+
+    const fields = [];
+    const values = [];
+
+    if (nombre) {
+      fields.push('nombre = ?');
+      values.push(nombre);
+    }
+
+    if (email) {
+      fields.push('email = ?');
+      values.push(email);
+    }
+
+    if (password && password.trim() !== "") {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      fields.push('password = ?');
+      values.push(hashedPassword);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ message: "No se proporcionaron campos para actualizar" });
+    }
+
+    const query = `UPDATE Usuario SET ${fields.join(', ')} WHERE "ID_USUARIO" = ?`;
+    values.push(userId);
+
+    const updateStmt = await conn.prepare(query);
+    await updateStmt.exec(values);
+
+    // Use updated values or fallback to existing ones
+    const updatedNombre = nombre || currentNombre;
+    const updatedEmail = email || currentEmail;
+
+    res.cookie("UserData", JSON.stringify({
+      userId,
+      email: updatedEmail,
+      role: currentRole,
+      nombre: updatedNombre
+    }), {
+      httpOnly: false,
+      sameSite: "Lax",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 4 * 60 * 60 * 1000
+    });
+
+    res.json({ message: "Perfil actualizado correctamente" });
+
+  } catch (error) {
+    console.error("Error al actualizar el perfil:", error);
+    res.status(500).json({ message: error.message });
+  }
+};
 
 // Eliminar usuario
 export const deleteUser = async (req, res) => {
