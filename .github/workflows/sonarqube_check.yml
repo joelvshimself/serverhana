@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - stage_jorge
+      - stage
 
 jobs:
   build:

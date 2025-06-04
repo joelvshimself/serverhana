@@ -1,7 +1,6 @@
 import request from 'supertest';
 import express from 'express';
 import * as twoFAController from '../src/controllers/twoFAController.js';
-import { poolPromise } from '../src/config/dbConfig.js';
 import speakeasy from 'speakeasy';
 import qrcode from 'qrcode';
 

@@ -21,7 +21,8 @@ export default defineConfig([
     ignores: [
       "coverage/**",
       "logs/**",
-      "node_modules/**"
+      "node_modules/**",
+      "test/**"
     ],
   }
 ]);
