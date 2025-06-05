@@ -15,7 +15,7 @@ const app = express();
 
 // Poner origin de produccion despues tambien
 app.use(cors({
-  origin: "http://localhost:5173", // frontend
+  origin: process.env.ORIGIN || "http://localhost:5173" , // frontend
   credentials: true,               // allow sending cookies
 }));
 
