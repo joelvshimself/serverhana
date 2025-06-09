@@ -48,7 +48,7 @@ const router = express.Router();
  *                     example: admin
  */
 
-router.get("/usuarios", auth("admin","developer"), getUsers);
+router.get("/usuarios", auth("admin","developer","detallista"), getUsers);
 
 /**
  * @swagger
