@@ -181,7 +181,7 @@ export const createUser = async (req, res) => {
 };
 
 
-const findUserById = async (id) => {
+export const findUserById = async (id) => {
   const conn = await poolPromise;
   const stmt = await conn.prepare('SELECT * FROM Usuario WHERE "ID_USUARIO" = ?');
   const result = await stmt.exec([id]);
