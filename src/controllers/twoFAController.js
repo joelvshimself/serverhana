@@ -85,6 +85,7 @@ export const verify2FA = async (req, res) => {
     });
     
     console.log("ambiente:",process.env.NODE_ENV)
+    console.log(process.env.NODE_ENV === "production")
     res.json({ message: "2FA exitoso", success: true });
 
   } catch (err) {
