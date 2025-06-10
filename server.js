@@ -14,9 +14,21 @@ dotenv.config();
 const app = express();
 
 // Poner origin de produccion despues tambien
+const allowedOrigins = [
+  process.env.ORIGIN,
+  process.env.ORIGIN2,
+  "http://localhost:5173"
+].filter(Boolean); // removes undefined or null values
+
 app.use(cors({
-  origin: process.env.ORIGIN || "http://localhost:5173" , // frontend
-  credentials: true,               // allow sending cookies
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
 }));
 
 app.use(express.json());
