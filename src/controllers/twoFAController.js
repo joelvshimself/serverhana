@@ -68,7 +68,7 @@ export const verify2FA = async (req, res) => {
     res.cookie("Auth", finalToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "Lax",
+      sameSite: "None",
       maxAge: 4 * 60 * 60 * 1000
     });
 
@@ -79,7 +79,7 @@ export const verify2FA = async (req, res) => {
       nombre: user.NOMBRE
     }), {
       httpOnly: false, // accesible by js
-      sameSite: "Lax",
+      sameSite: "None",
       secure: process.env.NODE_ENV === "production",
       maxAge: 4 * 60 * 60 * 1000 
     });

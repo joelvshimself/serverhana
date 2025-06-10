@@ -36,7 +36,7 @@ export const loginUser = async (req, res) => {
 
     res.cookie("PreAuth", tempToken, {
       httpOnly: true,
-      sameSite: "Lax",
+      sameSite: "None",
       secure: process.env.NODE_ENV === "production",
       maxAge: 15 * 60 * 1000 // 15 minutes
     });
@@ -112,12 +112,12 @@ export const logoutUser = (req, res) => {
   res.clearCookie("Auth", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    sameSite: "Lax",
+    sameSite: "None",
   });
 
   res.clearCookie("UserData", {
       httpOnly: false, // accesible by js
-      sameSite: "Lax",
+      sameSite: "None",
       secure: process.env.NODE_ENV === "production",
     });
 
@@ -290,7 +290,7 @@ export const updateSelf = async (req, res) => {
       nombre: updatedNombre
     }), {
       httpOnly: false,
-      sameSite: "Lax",
+      sameSite: "None",
       secure: process.env.NODE_ENV === "production",
       maxAge: 4 * 60 * 60 * 1000
     });
