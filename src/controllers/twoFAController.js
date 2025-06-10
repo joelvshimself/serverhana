@@ -83,7 +83,8 @@ export const verify2FA = async (req, res) => {
       secure: process.env.NODE_ENV === "production",
       maxAge: 4 * 60 * 60 * 1000 
     });
-
+    
+    console.log("ambiente:",process.env.NODE_ENV)
     res.json({ message: "2FA exitoso", success: true });
 
   } catch (err) {
