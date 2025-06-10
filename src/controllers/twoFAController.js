@@ -63,12 +63,12 @@ export const verify2FA = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "4h" }
     );
-
+    const isProd = process.env.NODE_ENV === "production";
     res.clearCookie("PreAuth");
     res.cookie("Auth", finalToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "None",
+      secure: isProd,
+      sameSite: isProd ? "None" : "Lax",
       maxAge: 4 * 60 * 60 * 1000
     });
 
@@ -79,8 +79,8 @@ export const verify2FA = async (req, res) => {
       nombre: user.NOMBRE
     }), {
       httpOnly: false, // accesible by js
-      sameSite: "None",
-      secure: process.env.NODE_ENV === "production",
+      secure: isProd,
+      sameSite: isProd ? "None" : "Lax",
       maxAge: 4 * 60 * 60 * 1000 
     });
     
