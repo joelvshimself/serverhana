@@ -33,11 +33,11 @@ export const loginUser = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
-
+    const isProd = process.env.NODE_ENV === "production";
     res.cookie("PreAuth", tempToken, {
       httpOnly: true,
-      sameSite: "None",
-      secure: process.env.NODE_ENV === "production",
+      secure: isProd,
+      sameSite: isProd ? "None" : "Lax",
       maxAge: 15 * 60 * 1000 // 15 minutes
     });
 
@@ -109,16 +109,17 @@ export const getUserInfo = (req, res) => {
 };
 
 export const logoutUser = (req, res) => {
+  const isProd = process.env.NODE_ENV === "production";
   res.clearCookie("Auth", {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "None",
+    secure: isProd,
+    sameSite: isProd ? "None" : "Lax",
   });
 
   res.clearCookie("UserData", {
       httpOnly: false, // accesible by js
-      sameSite: "None",
-      secure: process.env.NODE_ENV === "production",
+      secure: isProd,
+      sameSite: isProd ? "None" : "Lax",
     });
 
   res.status(200).json({ message: "Sesión cerrada" });
@@ -282,6 +283,7 @@ export const updateSelf = async (req, res) => {
     // Use updated values or fallback to existing ones
     const updatedNombre = nombre || currentNombre;
     const updatedEmail = email || currentEmail;
+    const isProd = process.env.NODE_ENV === "production";
 
     res.cookie("UserData", JSON.stringify({
       userId,
@@ -290,8 +292,8 @@ export const updateSelf = async (req, res) => {
       nombre: updatedNombre
     }), {
       httpOnly: false,
-      sameSite: "None",
-      secure: process.env.NODE_ENV === "production",
+      secure: isProd,
+      sameSite: isProd ? "None" : "Lax",
       maxAge: 4 * 60 * 60 * 1000
     });
 
