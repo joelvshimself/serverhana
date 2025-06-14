@@ -6,6 +6,6 @@
 1. Clona el repositorio:
    ```bash
    git clone https://github.com/joelvshimself/serverhana.git
-   cd serverhan
+   cd serverhana
    npm install
    node server.js
